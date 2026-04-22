@@ -1,0 +1,42 @@
+# Dataset directory
+dataset/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and outputs
+*.log
+*.pth
+*.pt
+checkpoints/
+models/
+DEVELOP_PLAN.md
+
+# Claude Code files
+CLAUDE.md
+CODING_STYLE.md
+example_cnn.py
