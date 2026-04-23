@@ -82,9 +82,9 @@ def get_cifar10_data_augmentation(
         # Heavier transforms (ColorJitter, Rotation, RandomErasing) are too
         # aggressive for small models like LeNet (~60K params).
         transform_train = transforms.Compose([
-            # transforms.RandomHorizontalFlip(p=0.5),
-            # transforms.RandomVerticalFlip(p=0.5),
-            # RandomApply([transforms.RandomCrop(32, padding=4)], p=0.5),
+            transforms.RandomHorizontalFlip(p=0.1),
+            transforms.RandomVerticalFlip(p=0.1),
+            RandomApply([transforms.RandomCrop(32, padding=4)], p=0.1),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
         ])
@@ -246,7 +246,7 @@ def train_model(
             print(f'Epoch {epoch+1}/{num_epochs}: '
                   f'Train Loss: {epoch_avg_loss:.4f}, '
                   f'Val Accuracy: {val_accuracy:.2f}%, '
-                  f'LR: {current_lr:.6f}, '
+                  f'Learning Rate: {current_lr:.6f}, '
                   f'Grad Norm: {avg_grad_norm:.4f}')
 
             # Early stopping logic
@@ -266,7 +266,7 @@ def train_model(
         else:
             print(f'Epoch {epoch+1}/{num_epochs}: '
                   f'Train Loss: {epoch_avg_loss:.4f}, '
-                  f'LR: {current_lr:.6f}, '
+                  f'Learning Rate: {current_lr:.6f}, '
                   f'Grad Norm: {avg_grad_norm:.4f}')
 
     print('Finished Training')
@@ -330,10 +330,10 @@ def predict(
 
     Example:
         >>> test_accuracy = predict(model, test_loader)
-        >>> print(f'测试集中的准确率为: {test_accuracy:.2f} %')
+        >>> print(f'Accuracy on test set: {test_accuracy:.2f} %')
     """
     accuracy = evaluate_accuracy(model, test_loader, device)
-    print(f'测试集中的准确率为: {accuracy:.2f} %')
+    print(f'Accuracy on test set: {accuracy:.2f} %')
     return accuracy
 
 
