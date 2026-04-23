@@ -423,7 +423,7 @@ def create_learning_rate_scheduler(
         scheduler_type: Type of scheduler ('cosine', 'step').
         total_epochs: Total number of training epochs.
         warmup_epochs: Number of warm-up epochs. If None, defaults to
-            max(2, 5% of total_epochs).
+            min(5, max(2, 5% of total_epochs)).
         initial_lr: Initial learning rate (used to scale warm-up).
         min_lr: Minimum learning rate (eta_min).
         T_0: Period for first restart in epochs. If None, defaults to
@@ -447,7 +447,7 @@ def create_learning_rate_scheduler(
         ... )
     """
     if warmup_epochs is None:
-        warmup_epochs = max(2, int(total_epochs * 0.05))
+        warmup_epochs = min(5, max(2, int(total_epochs * 0.05)))
     if T_0 is None:
         T_0 = max(1, total_epochs // 2)
 
