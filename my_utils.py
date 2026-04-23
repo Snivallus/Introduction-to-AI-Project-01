@@ -22,6 +22,11 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
 
+CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
+CIFAR_10_STD = (0.2470, 0.2435, 0.2616)
+CIFAR_10_CLASS = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+
 def get_device(use_cuda: bool = True) -> torch.device:
     """Get the available device for PyTorch computations.
 
@@ -63,13 +68,13 @@ def get_cifar10_data_augmentation() -> Tuple[transforms.Compose, transforms.Comp
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
         transforms.RandomRotation(15),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
         transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0)
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD)
     ])
 
     return transform_train, transform_test
