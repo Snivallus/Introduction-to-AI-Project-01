@@ -386,7 +386,7 @@ def plot_loss_curves(
         print(f"Final validation accuracy: {val_accuracies[-1]:.2f}%")
 
 
-def count_parameters(model: nn.Module) -> Dict[str, int]:
+def count_parameters(model: nn.Module, decimals: int = 3) -> Dict[str, int]:
     """Count total and trainable parameters in a model.
 
     Args:
@@ -405,10 +405,36 @@ def count_parameters(model: nn.Module) -> Dict[str, int]:
     non_trainable_params = total_params - trainable_params
 
     return {
-        'total': total_params,
-        'trainable': trainable_params,
-        'non_trainable': non_trainable_params
+        'total': format_parameters(count=total_params, decimals=decimals),
+        'trainable': format_parameters(count=trainable_params, decimals=decimals),
+        'non_trainable': format_parameters(count=non_trainable_params, decimals=decimals)
     }
+
+
+def format_parameters(count: int, decimals: int) -> str:
+    """Convert a parameter count to a human-readable string with K/M/B suffix.
+
+    Args:
+        count: Number of parameters (integer).
+        decimals: Number of decimal places to keep (default: 3).
+
+    Returns:
+        Formatted string, e.g. "6.432M", "123.4K", "1.2B", or "456" for small numbers.
+
+    Example:
+        >>> format_parameters(6432000)
+        '6.432M'
+        >>> format_parameters(123456)
+        '123.456K'
+    """
+    if count >= 1e9:
+        return f"{count / 1e9:.{decimals}f}B".rstrip('0').rstrip('.') + 'B'
+    elif count >= 1e6:
+        return f"{count / 1e6:.{decimals}f}M".rstrip('0').rstrip('.') + 'M'
+    elif count >= 1e3:
+        return f"{count / 1e3:.{decimals}f}K".rstrip('0').rstrip('.') + 'K'
+    else:
+        return str(count)
 
 
 def create_learning_rate_scheduler(
