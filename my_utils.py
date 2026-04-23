@@ -164,6 +164,7 @@ def train_model(
     best_val_accuracy = 0.0
     patience_counter = 0
     patience = early_stopping_patience if early_stopping_patience is not None else float('inf')
+    restart_count = 0
 
     device = next(model.parameters()).device
     print(f"Training on device: {device}")
@@ -182,9 +183,15 @@ def train_model(
                     param_group['lr'] = lr
             else:
                 # Step the scheduler once per epoch after warm-up
+                old_lr = optimizer.param_groups[0]['lr']
                 scheduler.step()
+                new_lr = optimizer.param_groups[0]['lr']
+                if new_lr > old_lr * 1.5:
+                    restart_count += 1
+                    print(f"  >> Cosine annealing restart #{restart_count}: LR {old_lr:.6f} -> {new_lr:.6f}")
 
         running_loss = 0.0
+        running_grad_norm = 0.0
         total_batches = 0
 
         # Training phase
@@ -204,9 +211,12 @@ def train_model(
             # 4. Backward pass
             loss.backward()
 
-            # 5. Gradient clipping (if specified)
+            # 5. Gradient clipping (if specified) and norm tracking
             if gradient_clip is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip)
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip).item()
+            else:
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float('inf')).item()
+            running_grad_norm += grad_norm
 
             # 6. Optimizer step
             optimizer.step()
@@ -224,6 +234,10 @@ def train_model(
         epoch_avg_loss = running_loss / total_batches if total_batches > 0 else 0
         train_losses.append(epoch_avg_loss)
 
+        # Compute average gradient norm and get current learning rate
+        avg_grad_norm = running_grad_norm / total_batches if total_batches > 0 else 0.0
+        current_lr = optimizer.param_groups[0]['lr']
+
         # Validation phase (if validation loader provided)
         if val_loader is not None:
             val_accuracy = evaluate_accuracy(model, val_loader, device)
@@ -231,7 +245,9 @@ def train_model(
 
             print(f'Epoch {epoch+1}/{num_epochs}: '
                   f'Train Loss: {epoch_avg_loss:.4f}, '
-                  f'Val Accuracy: {val_accuracy:.2f}%')
+                  f'Val Accuracy: {val_accuracy:.2f}%, '
+                  f'LR: {current_lr:.6f}, '
+                  f'Grad Norm: {avg_grad_norm:.4f}')
 
             # Early stopping logic
             if val_accuracy > best_val_accuracy:
@@ -248,7 +264,10 @@ def train_model(
                 print(f'Early stopping triggered at epoch {epoch+1}')
                 break
         else:
-            print(f'Epoch {epoch+1}/{num_epochs}: Train Loss: {epoch_avg_loss:.4f}')
+            print(f'Epoch {epoch+1}/{num_epochs}: '
+                  f'Train Loss: {epoch_avg_loss:.4f}, '
+                  f'LR: {current_lr:.6f}, '
+                  f'Grad Norm: {avg_grad_norm:.4f}')
 
     print('Finished Training')
 
