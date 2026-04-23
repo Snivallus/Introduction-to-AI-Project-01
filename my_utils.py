@@ -313,12 +313,12 @@ def evaluate_accuracy(
     return accuracy
 
 
-def predict(
+def evaluate(
     model: nn.Module,
     test_loader: DataLoader,
     device: Optional[torch.device] = None
 ) -> float:
-    """Predict and calculate accuracy on test set.
+    """Evaluate model accuracy on a test set and print the result.
 
     Args:
         model: PyTorch model to evaluate.
@@ -329,8 +329,8 @@ def predict(
         Test accuracy percentage (0-100).
 
     Example:
-        >>> test_accuracy = predict(model, test_loader)
-        >>> print(f'Accuracy on test set: {test_accuracy:.2f} %')
+        >>> test_acc = evaluate(model, test_loader)
+        >>> print(f'Accuracy on test set: {test_acc:.2f} %')
     """
     accuracy = evaluate_accuracy(model, test_loader, device)
     print(f'Accuracy on test set: {accuracy:.2f} %')
