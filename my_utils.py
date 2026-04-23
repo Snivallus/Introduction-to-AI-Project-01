@@ -258,9 +258,6 @@ def train_model(
         else:
             print(f'Epoch {epoch+1}/{num_epochs}: Train Loss: {epoch_avg_loss:.4f}')
 
-        # Save checkpoint for this epoch
-        torch.save(model.state_dict(), f"{save_path}/epoch_{epoch + 1}_model.pth")
-
     print('Finished Training')
 
     return train_losses, val_accuracies
