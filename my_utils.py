@@ -11,8 +11,7 @@ Example:
 """
 
 # Standard library
-import os
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Dict, List, Tuple, Optional, Any
 
 # Third-party
 import torch
@@ -21,7 +20,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-import numpy as np
 
 
 def get_device(use_cuda: bool = True) -> torch.device:
