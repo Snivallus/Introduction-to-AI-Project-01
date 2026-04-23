@@ -122,7 +122,8 @@ def train_model(
     val_loader: Optional[DataLoader] = None,
     early_stopping_patience: Optional[int] = None,
     gradient_clip: Optional[float] = 1.0,
-    print_every: int = 1000
+    print_every: int = 1000,
+    scheduler_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[List[float], Optional[List[float]]]:
     """Train a neural network model with optional validation and early stopping.
 
@@ -138,6 +139,10 @@ def train_model(
             before early stopping (optional).
         gradient_clip: Maximum gradient norm for clipping (optional).
         print_every: Print training status every N batches.
+        scheduler_config: Dict returned by
+            :func:`create_learning_rate_scheduler`. If provided, applies
+            linear LR warm-up for the first ``warmup_epochs`` epochs, then
+            steps the scheduler each epoch after warm-up.
 
     Returns:
         Tuple of (train_losses, val_accuracies) where:
@@ -148,9 +153,11 @@ def train_model(
         ValueError: If save_path is not a valid directory path.
 
     Example:
+        >>> scheduler_cfg = create_learning_rate_scheduler(
+        ...     optimizer, total_epochs=20, initial_lr=0.001)
         >>> train_losses, val_accuracies = train_model(
         ...     model, train_loader, criterion, optimizer, 20, 'checkpoints/',
-        ...     val_loader=val_loader, early_stopping_patience=10
+        ...     val_loader=val_loader, scheduler_config=scheduler_cfg
         ... )
     """
     import os
@@ -167,6 +174,21 @@ def train_model(
     print(f"Training on device: {device}")
 
     for epoch in range(num_epochs):
+        # Learning rate warm-up and scheduling
+        if scheduler_config is not None:
+            warmup_epochs = scheduler_config['warmup_epochs']
+            warmup_lr = scheduler_config['initial_lr']
+            scheduler = scheduler_config['scheduler']
+
+            if epoch < warmup_epochs:
+                # Linear warm-up: scale LR from 0 to initial_lr
+                lr = warmup_lr * (epoch + 1) / warmup_epochs
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr
+            else:
+                # Step the scheduler once per epoch after warm-up
+                scheduler.step()
+
         running_loss = 0.0
         total_batches = 0
 
@@ -379,46 +401,83 @@ def count_parameters(model: nn.Module) -> Dict[str, int]:
 def create_learning_rate_scheduler(
     optimizer: optim.Optimizer,
     scheduler_type: str = 'cosine',
-    initial_lr: float = 0.001,
     total_epochs: int = 20,
-    warmup_epochs: int = 2,
+    warmup_epochs: Optional[int] = None,
+    initial_lr: float = 0.001,
     min_lr: float = 1e-6,
-    T_0: int = 10,
+    T_0: Optional[int] = None,
     T_mult: int = 2
-) -> Any:
-    """Create a learning rate scheduler.
+) -> Dict[str, Any]:
+    """Create a learning rate scheduler with linear warm-up configuration.
+
+    Returns a dictionary with scheduler and warm-up parameters, designed
+    to be passed to ``train_model()`` via its ``scheduler_config`` parameter.
+    The caller should not call ``scheduler.step()`` manually — ``train_model``
+    handles both warm-up and scheduler stepping automatically.
 
     Args:
         optimizer: Optimizer to schedule.
-        scheduler_type: Type of scheduler ('cosine', 'step', 'plateau').
-        initial_lr: Initial learning rate.
+        scheduler_type: Type of scheduler ('cosine', 'step').
         total_epochs: Total number of training epochs.
-        warmup_epochs: Number of warm-up epochs.
-        min_lr: Minimum learning rate.
-        T_0: Initial period for cosine annealing with restarts.
+        warmup_epochs: Number of warm-up epochs. If None, defaults to
+            max(2, 5% of total_epochs).
+        initial_lr: Initial learning rate (used to scale warm-up).
+        min_lr: Minimum learning rate (eta_min).
+        T_0: Period for first restart in epochs. If None, defaults to
+            total_epochs // 2.
         T_mult: Multiplication factor for T_0 after each restart.
 
     Returns:
-        Learning rate scheduler object.
+        Dictionary with keys:
+        - ``scheduler``: PyTorch learning rate scheduler.
+        - ``warmup_epochs``: Number of warm-up epochs.
+        - ``initial_lr``: Initial learning rate.
 
-    Note:
-        This is a placeholder function. Actual scheduler implementation
-        should be integrated into the training loop.
+    Example:
+        >>> config = create_learning_rate_scheduler(
+        ...     optimizer, scheduler_type='cosine',
+        ...     total_epochs=20, initial_lr=0.001
+        ... )
+        >>> train_losses, val_accs = train_model(
+        ...     model, loader, criterion, optimizer, 20, 'ckpt/',
+        ...     scheduler_config=config
+        ... )
     """
-    if scheduler_type == 'cosine':
-        from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-        scheduler = CosineAnnealingWarmRestarts(
-            optimizer, T_0=T_0, T_mult=T_mult, eta_min=min_lr
-        )
-        print(f"Created CosineAnnealingWarmRestarts scheduler (T_0={T_0}, T_mult={T_mult})")
-    elif scheduler_type == 'step':
-        from torch.optim.lr_scheduler import StepLR
-        scheduler = StepLR(optimizer, step_size=total_epochs // 3, gamma=0.1)
-        print(f"Created StepLR scheduler (step_size={total_epochs // 3}, gamma=0.1)")
-    else:
-        raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+    if warmup_epochs is None:
+        warmup_epochs = max(2, int(total_epochs * 0.05))
+    if T_0 is None:
+        T_0 = max(1, total_epochs // 2)
 
-    return scheduler
+    # Suppress the "was invoked with deprecated argument" spam from PyTorch
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        if scheduler_type == 'cosine':
+            from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+            scheduler = CosineAnnealingWarmRestarts(
+                optimizer, T_0=T_0, T_mult=T_mult, eta_min=min_lr
+            )
+            scheduler_desc = (
+                f"CosineAnnealingWarmRestarts (T_0={T_0}, T_mult={T_mult})"
+            )
+        elif scheduler_type == 'step':
+            from torch.optim.lr_scheduler import StepLR
+            step_size = max(1, total_epochs // 3)
+            scheduler = StepLR(optimizer, step_size=step_size, gamma=0.1)
+            scheduler_desc = f"StepLR (step_size={step_size}, gamma=0.1)"
+        else:
+            raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+
+    print(f"Created {scheduler_desc}")
+    print(f"  Warm-up: {warmup_epochs} epoch(s), Initial LR: {initial_lr}")
+    print(f"  Min LR: {min_lr}, Total epochs: {total_epochs}")
+
+    return {
+        'scheduler': scheduler,
+        'warmup_epochs': warmup_epochs,
+        'initial_lr': initial_lr,
+    }
 
 
 if __name__ == "__main__":
