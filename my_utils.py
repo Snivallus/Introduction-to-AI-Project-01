@@ -402,10 +402,12 @@ def count_parameters(model: nn.Module) -> Dict[str, int]:
     """
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    non_trainable_params = total_params - trainable_params
 
     return {
         'total': total_params,
-        'trainable': trainable_params
+        'trainable': trainable_params,
+        'non_trainable': non_trainable_params
     }
 
 
