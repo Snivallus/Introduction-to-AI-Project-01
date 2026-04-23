@@ -17,8 +17,9 @@ from typing import Dict, List, Tuple, Optional, Any
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from torchvision.transforms import RandomApply
 import matplotlib.pyplot as plt
 
 
@@ -81,9 +82,9 @@ def get_cifar10_data_augmentation(
         # Heavier transforms (ColorJitter, Rotation, RandomErasing) are too
         # aggressive for small models like LeNet (~60K params).
         transform_train = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomCrop(32, padding=4),
+            # transforms.RandomHorizontalFlip(p=0.5),
+            # transforms.RandomVerticalFlip(p=0.5),
+            # RandomApply([transforms.RandomCrop(32, padding=4)], p=0.5),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
         ])
@@ -92,13 +93,13 @@ def get_cifar10_data_augmentation(
         transform_train = transforms.Compose([
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomCrop(32, padding=4),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.RandomRotation(30),
+            RandomApply([transforms.RandomCrop(32, padding=4)], p=0.5),
+            RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=0.5),
+            RandomApply([transforms.RandomRotation(30)], p=0.5),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
             transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
-            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0))
+            RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))], p=0.5)
         ])
     else:
         raise ValueError(f"Unknown style: '{style}'. Use 'light' or 'full'.")
@@ -411,7 +412,7 @@ def create_learning_rate_scheduler(
         scheduler_type: Type of scheduler ('cosine', 'step').
         total_epochs: Total number of training epochs.
         warmup_epochs: Number of warm-up epochs. If None, defaults to
-            min(5, max(2, 5% of total_epochs)).
+            min(5, max(2, 10% of total_epochs)).
         initial_lr: Initial learning rate (used to scale warm-up).
         min_lr: Minimum learning rate (eta_min).
         T_0: Period for first restart in epochs. If None, defaults to
@@ -435,7 +436,7 @@ def create_learning_rate_scheduler(
         ... )
     """
     if warmup_epochs is None:
-        warmup_epochs = min(5, max(2, int(total_epochs * 0.05)))
+        warmup_epochs = min(5, max(2, int(total_epochs * 0.1)))
     if T_0 is None:
         T_0 = max(1, total_epochs // 2)
 
