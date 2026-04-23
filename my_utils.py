@@ -94,10 +94,11 @@ def get_cifar10_data_augmentation(
             transforms.RandomVerticalFlip(p=0.5),
             transforms.RandomCrop(32, padding=4),
             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.RandomRotation(15),
+            transforms.RandomRotation(30),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0)
+            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
+            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0))
         ])
     else:
         raise ValueError(f"Unknown style: '{style}'. Use 'light' or 'full'.")
