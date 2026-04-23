@@ -50,69 +50,59 @@ def get_device(use_cuda: bool = True) -> torch.device:
     return device
 
 
-def get_cifar10_data_augmentation() -> Tuple[transforms.Compose, transforms.Compose]:
+def get_cifar10_data_augmentation(
+    style: str = 'light'
+) -> Tuple[transforms.Compose, transforms.Compose]:
     """Get data augmentation transforms for CIFAR-10.
+
+    Args:
+        style: Augmentation style.
+            ``'light'`` — basic flips and crops only (suitable for small models
+            like LeNet).
+            ``'full'`` — aggressive augmentation with ColorJitter, rotation,
+            and random erasing (suitable for modern CNNs like ResNet).
 
     Returns:
         Tuple of (transform_train, transform_test) where:
         - transform_train: Transformations for training data (with augmentation)
         - transform_test: Transformations for test data (basic normalization)
 
-    Note:
-        Training augmentations include: random horizontal flip, random crop,
-        color jitter, random rotation, and random erasing.
+    Raises:
+        ValueError: If ``style`` is not ``'light'`` or ``'full'``.
     """
-    transform_train = transforms.Compose([
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomCrop(32, padding=4),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-        transforms.RandomRotation(15),
-        transforms.ToTensor(),
-        transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-        transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0)
-    ])
-
+    # Test transform is the same regardless of style: no augmentation
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD)
     ])
 
+    if style == 'light':
+        # Gentle augmentation: flips and crops only.
+        # Heavier transforms (ColorJitter, Rotation, RandomErasing) are too
+        # aggressive for small models like LeNet (~60K params).
+        transform_train = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
+        ])
+    elif style == 'full':
+        # Aggressive augmentation suitable for large-capacity models.
+        transform_train = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomCrop(32, padding=4),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+            transforms.RandomRotation(15),
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
+            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0)
+        ])
+    else:
+        raise ValueError(f"Unknown style: '{style}'. Use 'light' or 'full'.")
+
     return transform_train, transform_test
-
-
-def create_train_val_split(
-    dataset: Dataset,
-    val_ratio: float = 0.1,
-    seed: int = 42
-) -> Tuple[Dataset, Dataset]:
-    """Split dataset into training and validation sets.
-
-    Args:
-        dataset: PyTorch Dataset to split.
-        val_ratio: Proportion of data to use for validation (0.0 to 1.0).
-        seed: Random seed for reproducibility.
-
-    Returns:
-        Tuple of (train_dataset, val_dataset).
-
-    Raises:
-        ValueError: If val_ratio is not between 0 and 1.
-    """
-    if not 0 <= val_ratio <= 1:
-        raise ValueError(f"val_ratio must be between 0 and 1, got {val_ratio}")
-
-    # Set random seed for reproducibility
-    torch.manual_seed(seed)
-
-    val_size = int(val_ratio * len(dataset))
-    train_size = len(dataset) - val_size
-
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size]
-    )
-
-    print(f"Train set size: {train_size}, Validation set size: {val_size}")
-    return train_dataset, val_dataset
 
 
 def train_model(
