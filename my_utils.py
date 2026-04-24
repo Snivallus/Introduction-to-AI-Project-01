@@ -183,6 +183,25 @@ def train_model(
     device = next(model.parameters()).device
     print(f"Training on device: {device}")
 
+    # ── Initial evaluation (before any training) ────────────────────────
+    # Verify that the initialized model produces reasonable baseline values.
+    model.eval()
+    with torch.no_grad():
+        sample_batch = next(iter(train_loader))
+        sample_inputs, sample_labels = sample_batch
+        sample_inputs, sample_labels = sample_inputs.to(device), sample_labels.to(device)
+        sample_outputs = model(sample_inputs)
+        initial_loss = criterion(sample_outputs, sample_labels).item()
+
+    print(f"Initial training loss (before training): {initial_loss:.4f}")
+
+    if val_loader is not None:
+        initial_val_accuracy = evaluate_accuracy(model, val_loader, device)
+        print(f"Initial validation accuracy (before training): {initial_val_accuracy:.2f}%")
+
+    print("-" * 50)
+    # ───────────────────────────────────────────────────────────────────
+
     for epoch in range(num_epochs):
         # Learning rate warm-up and scheduling
         if scheduler_config is not None:
