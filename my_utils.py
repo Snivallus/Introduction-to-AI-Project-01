@@ -381,23 +381,15 @@ def count_parameters(model: nn.Module, decimals: int = 3) -> Dict[str, int]:
         >>> print(f"Total parameters: {counts['total']:,}")
         >>> print(f"Trainable parameters: {counts['trainable']:,}")
     """
-<<<<<<< Updated upstream
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     non_trainable_params = total_params - trainable_params
 
     return {
-        'total': format_parameters(count=total_params, decimals=decimals),
-        'trainable': format_parameters(count=trainable_params, decimals=decimals),
-        'non_trainable': format_parameters(count=non_trainable_params, decimals=decimals)
+        'total': total_params,
+        'trainable': trainable_params,
+        'non_trainable': non_trainable_params,
     }
-=======
-    for threshold, suffix in [(1e9, 'B'), (1e6, 'M'), (1e3, 'K')]:
-        if count >= threshold:
-            value = count / threshold
-            return f"{value:.{decimals}f}".rstrip('0').rstrip('.') + suffix
-    return str(count)
->>>>>>> Stashed changes
 
 
 def format_parameters(count: int, decimals: int) -> str:
