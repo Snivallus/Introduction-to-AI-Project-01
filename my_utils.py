@@ -11,20 +11,24 @@ Example:
     >>> print(f"Accuracy: {result['accuracy']:.2f}%")
 """
 
-# Standard library
-from typing import Dict, List, Tuple, Optional, Any
-
-# Third-party
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from torchvision.transforms import RandomApply
 import matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.metrics import precision_recall_fscore_support
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple
+)
+
 
 CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_10_STD = (0.2470, 0.2435, 0.2616)
@@ -316,8 +320,6 @@ def evaluate_accuracy(
     return accuracy
 
 
-
-
 def plot_loss_curves(
     train_losses: List[float],
     val_accuracies: Optional[List[float]] = None,
@@ -386,9 +388,9 @@ def count_parameters(model: nn.Module, decimals: int = 3) -> Dict[str, int]:
     non_trainable_params = total_params - trainable_params
 
     return {
-        'total': total_params,
-        'trainable': trainable_params,
-        'non_trainable': non_trainable_params,
+        'total': format_parameters(count=total_params, decimals=decimals),
+        'trainable': format_parameters(count=trainable_params, decimals=decimals),
+        'non_trainable': format_parameters(count=non_trainable_params, decimals=decimals),
     }
 
 
