@@ -797,95 +797,6 @@ def mc_dropout_evaluate(
 
 
 # ------------------------------------------------------------------
-# 5. CIFAR-10-C corruption robustness
-# ------------------------------------------------------------------
-
-def evaluate_cifar10c(
-    model: nn.Module,
-    device: torch.device,
-    data_root: str = './dataset',
-    corruptions: Optional[List[str]] = None,
-    severity: int = 5,
-) -> Optional[Dict[str, float]]:
-    """Evaluate corruption robustness on CIFAR-10-C.
-
-    CIFAR-10-C must be downloaded separately from:
-    https://github.com/hendrycks/robustness
-
-    The dataset contains 19 corruptions at 5 severity levels.  By default
-    this function evaluates on a representative subset of 4 corruptions
-    at the hardest severity level.
-
-    Args:
-        model: PyTorch model.
-        device: Computation device.
-        data_root: Root directory containing ``CIFAR-10-C/``.
-        corruptions: Corruption names to evaluate.  If ``None``, uses
-            ``['gaussian_noise', 'defocus_blur', 'contrast',
-            'elastic_transform']``.
-        severity: Corruption severity (1 = mildest, 5 = hardest).
-
-    Returns:
-        Dict mapping corruption name → accuracy percentage, or ``None``
-        if the ``CIFAR-10-C`` directory is not found.
-    """
-
-    cifar10c_root = Path(data_root) / 'CIFAR-10-C'
-    if not cifar10c_root.is_dir():
-        return None
-
-    if corruptions is None:
-        corruptions = [
-            'gaussian_noise',
-            'defocus_blur',
-            'contrast',
-            'elastic_transform',
-        ]
-
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-    ])
-
-    labels = np.load(str(cifar10c_root / 'labels.npy'))
-    results: Dict[str, float] = {}
-    model.eval()
-
-    for corruption in corruptions:
-        data_path = cifar10c_root / f'{corruption}.npy'
-        if not data_path.exists():
-            print(f"  Warning: {corruption}.npy not found, skipping.")
-            continue
-
-        images = np.load(str(data_path))
-        start = (severity - 1) * 10000
-        end = severity * 10000
-        images_sev = images[start:end]
-        labels_sev = labels[start:end]
-
-        # Inline dataset for this corruption
-        class _CIFAR10CDataset(Dataset):
-            def __init__(self, imgs: np.ndarray, lbls: np.ndarray,
-                         xform: transforms.Compose) -> None:
-                self.images = imgs
-                self.labels = lbls
-                self.transform = xform
-
-            def __len__(self) -> int:
-                return len(self.images)
-
-            def __getitem__(self, idx: int):
-                img = self.transform(self.images[idx])
-                return img, int(self.labels[idx])
-
-        dataset = _CIFAR10CDataset(images_sev, labels_sev, transform)
-        loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=2)
-        results[corruption] = evaluate_accuracy(model, loader, device)
-
-    return results
-
-
-# ------------------------------------------------------------------
 # Plotting helpers
 # ------------------------------------------------------------------
 
@@ -1023,8 +934,6 @@ def evaluate(
     plot_dir: str = 'figures',
     n_bins_ece: int = 10,
     mc_dropout_samples: int = 20,
-    compute_cifar10c: bool = False,
-    cifar10c_root: str = './dataset',
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """Comprehensive evaluation of a CIFAR-10 classifier.
@@ -1038,8 +947,6 @@ def evaluate(
        :func:`compute_prediction_distribution_kl`).
     4. **MC Dropout uncertainty** (via :func:`mc_dropout_evaluate`; only
        when the model contains dropout layers).
-    5. **CIFAR-10-C corruption robustness** (via :func:`evaluate_cifar10c`;
-       only when ``compute_cifar10c=True`` and data is found).
 
     Args:
         model: PyTorch model to evaluate.
@@ -1055,8 +962,6 @@ def evaluate(
         n_bins_ece: Number of confidence bins for ECE computation.
         mc_dropout_samples: Number of stochastic forward passes for MC
             Dropout (ignored if the model has no dropout).
-        compute_cifar10c: If ``True``, attempt CIFAR-10-C evaluation.
-        cifar10c_root: Parent directory of ``CIFAR-10-C/``.
         verbose: If ``True``, print a results summary.
 
     Returns:
@@ -1074,8 +979,6 @@ def evaluate(
         - ``pred_class_distribution`` — dict of class name → count
         - ``mc_dropout`` — dict from :func:`mc_dropout_evaluate`, or ``None``
           if the model has no dropout
-        - ``cifar10c`` — dict from :func:`evaluate_cifar10c`, or ``None``
-          if not requested or data unavailable
         - ``predictions`` — ``(n,)`` numpy array of predicted class indices
         - ``ground_truth`` — ``(n,)`` numpy array of true class indices
         - ``probabilities`` — ``(n, num_classes)`` numpy softmax probabilities
@@ -1134,17 +1037,6 @@ def evaluate(
             dropout_result.pop('sample_variances', None)
             dropout_result.pop('accurate_mask', None)
 
-    # ── 9. CIFAR-10-C ────────────────────────────────────────────────
-    cifar10c_result: Optional[Dict[str, float]] = None
-    if compute_cifar10c:
-        if verbose:
-            print("\n[CIFAR-10-C] Evaluating corruption robustness ...")
-        cifar10c_result = evaluate_cifar10c(model, device, data_root=cifar10c_root)
-        if cifar10c_result is None and verbose:
-            print("  → CIFAR-10-C not found.  Download from "
-                  "https://github.com/hendrycks/robustness and place in "
-                  "``./dataset/CIFAR-10-C/``.")
-
     # ── Assemble result dict ─────────────────────────────────────────
     result: Dict[str, Any] = {
         'model_name': model_name,
@@ -1161,7 +1053,6 @@ def evaluate(
         'true_class_distribution': true_dist,
         'pred_class_distribution': pred_dist,
         'mc_dropout': dropout_result,
-        'cifar10c': cifar10c_result,
         'predictions': predictions,
         'ground_truth': targets,
         'probabilities': probabilities,
@@ -1182,12 +1073,6 @@ def evaluate(
             print(f"    Avg predictive variance:      {dropout_result['variance_mean']:.6f}")
             print(f"    Accurate variance (mean):     {dropout_result['accurate_var_mean']:.6f}")
             print(f"    Inaccurate variance (mean):   {dropout_result['inaccurate_var_mean']:.6f}")
-        if cifar10c_result:
-            avg_c = float(np.mean(list(cifar10c_result.values())))
-            print(f"  CIFAR-10-C (avg {len(cifar10c_result)} corruptions): {avg_c:.2f}%")
-            for corr_name, corr_acc in cifar10c_result.items():
-                drop = accuracy - corr_acc
-                print(f"    {corr_name:30s}: {corr_acc:.2f}%  (Δ = {drop:.2f}%)")
         print(f"{'─' * 70}\n")
 
     # ── Save plots ───────────────────────────────────────────────────
