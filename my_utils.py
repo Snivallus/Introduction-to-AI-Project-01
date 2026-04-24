@@ -21,6 +21,7 @@ import torchvision.transforms as transforms
 from torchvision.transforms import RandomApply
 import matplotlib.pyplot as plt
 from pathlib import Path
+import pandas as pd
 from sklearn.metrics import precision_recall_fscore_support
 from contextlib import redirect_stdout
 from typing import (
@@ -30,64 +31,15 @@ from typing import (
     Optional,
     Tuple
 )
+from my_model import LeNet
 
 
 CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_10_STD = (0.2470, 0.2435, 0.2616)
 CIFAR_10_CLASS = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-
-class LeNet(nn.Module):
-    """LeNet-style CNN for CIFAR-10 image classification.
-
-    Original architecture adapted for 32x32 RGB images.
-    Consists of two convolutional layers and three fully connected layers.
-    """
-
-    def __init__(self, dropout: Optional[float] = None) -> None:
-        super(LeNet, self).__init__()
-
-        # Convolutional layer: 3 input channels (RGB), 6 output channels, 5x5 kernel
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        # Convolutional layer: 6 input channels, 16 output channels, 5x5 kernel
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        # Fully connected layers: y = Wx + b
-        self.fc1   = nn.Linear(16*5*5, 120)
-        self.fc2   = nn.Linear(120, 84)
-        self.fc3   = nn.Linear(84, 10)
-        # Optional dropout layer for regularization
-        self.dropout = None
-        if dropout is not None:
-            if isinstance(dropout, float) and 0 < dropout < 1:
-                self.dropout = nn.Dropout(dropout)
-            else:
-                raise ValueError("dropout must be a float between 0 and 1")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the network.
-
-        Args:
-            x: Input tensor of shape (batch_size, 3, 32, 32).
-
-        Returns:
-            Output tensor of shape (batch_size, 10).
-        """
-        # [batch_size, 3, 32, 32] -> conv1 -> [batch_size, 6, 28, 28] -> relu -> maxpool -> [batch_size, 6, 14, 14]
-        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
-        # [batch_size, 6, 14, 14] -> conv2 -> [batch_size, 16, 10, 10] -> relu -> maxpool -> [batch_size, 16, 5, 5]
-        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-        # Flatten: [batch_size, 16 * 5 * 5] = [batch_size, 400]
-        x = x.view(x.size()[0], -1)
-        # [batch_size, 400] -> fc1 -> [batch_size, 120]
-        x = F.relu(self.fc1(x))
-        # [batch_size, 120] -> dropout (optional) -> [batch_size, 120]
-        if self.dropout is not None:
-            x = self.dropout(x)
-        # [batch_size, 120] -> fc2 -> [batch_size, 84]
-        x = F.relu(self.fc2(x))
-        # [batch_size, 84] -> fc3 -> [batch_size, 10]
-        x = self.fc3(x)
-        return x
+FIGURE_DIR = Path('figures')
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_device(use_cuda: bool = True) -> torch.device:
@@ -561,22 +513,23 @@ def create_learning_rate_scheduler(
 
 def train_experiment(
     exp_idx: int,
+    dropout: Optional[float],
     lr: float,
     wd: float,
     ls: float,
     bs: int,
-    dropout_rate: float,
     train_indices: List[int],
     val_indices: List[int],
     num_epochs: int,
+    T_0: int,
     ckpt_dir: str,
     log_dir: str,
 ) -> Dict[str, Any]:
     """Train a single LeNet with dropout for Task3 hyperparameter tuning.
 
-    Each call creates a fresh model, data loaders, optimizer, and trains
-    independently.  Training progress is written to a log file inside
-    ``log_dir``.  After training, evaluates on the CIFAR-10 test set via
+    Each call creates data loaders, optimizer, and trains independently.  
+    Training progress is written to a log file inside ``log_dir``.  
+    After training, evaluates on the CIFAR-10 test set via
     :func:`evaluate` and records the test accuracy.
 
     Args:
@@ -585,22 +538,24 @@ def train_experiment(
         wd: Weight decay (L2 regularization).
         ls: Label smoothing epsilon.
         bs: Batch size.
-        dropout_rate: Dropout probability (passed to :class:`LeNet`).
         train_indices: Indices into the full CIFAR-10 training set for
             training samples.
         val_indices: Indices into the full CIFAR-10 training set for
             validation samples.
         num_epochs: Maximum number of training epochs.
+        T_0: Number of epochs for the first cosine annealing restart.
         ckpt_dir: Directory for model checkpoints.
         log_dir: Directory for training log files.
 
     Returns:
         Dict with keys: ``experiment_id``, ``learning_rate``, ``weight_decay``,
-        ``label_smoothing``, ``batch_size``, ``dropout_rate``,
+        ``label_smoothing``, ``batch_size``, ,
         ``best_val_accuracy``, ``test_accuracy``, ``final_train_loss``,
         ``epochs_trained``, ``optimizer``, ``log_file``.
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Move model to device
+    device = get_device()
+    model = LeNet(dropout=dropout).to(device)
 
     # Data transforms (light augmentation — same as notebook setup)
     transform_train, transform_test = get_cifar10_data_augmentation(style="light")
@@ -632,9 +587,6 @@ def train_experiment(
         testset, batch_size=bs, shuffle=False, num_workers=1,
     )
 
-    # Fresh LeNet model with dropout for all Task3 experiments
-    model = LeNet(dropout=dropout_rate).to(device)
-
     # Adam optimizer with L2 regularization via weight_decay
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
     criterion = nn.CrossEntropyLoss(label_smoothing=ls)
@@ -645,6 +597,7 @@ def train_experiment(
         scheduler_type="cosine",
         total_epochs=num_epochs,
         initial_lr=lr,
+        T_0=T_0
     )
 
     log_file = Path(log_dir) / f"exp_{exp_idx:02d}_lr{lr}_wd{wd}_ls{ls}_bs{bs}.log"
@@ -684,7 +637,6 @@ def train_experiment(
         "weight_decay": wd,
         "label_smoothing": ls,
         "batch_size": bs,
-        "dropout_rate": dropout_rate,
         "best_val_accuracy": best_val_acc,
         "test_accuracy": test_accuracy,
         "final_train_loss": final_loss,
@@ -718,8 +670,6 @@ def plot_task3_hyperparameter_effects(
         metric: Column name in ``results_df`` holding the accuracy metric
             to plot (default ``'test_accuracy'``).
     """
-    import pandas as pd
-
     save_path = Path(save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -789,25 +739,6 @@ def plot_task3_hyperparameter_effects(
                 dpi=150, bbox_inches='tight')
     plt.show()
     print(f"Saved: {save_path / f'{figure_prefix}_hyperparameter_effects.pdf'}")
-
-    # ── Also save a ranked bar chart for quick reference ──
-    fig2, ax2 = plt.subplots(figsize=(10, max(4, len(results_df) * 0.25)))
-    sorted_df = results_df.sort_values(metric, ascending=True)
-    colors = plt.cm.viridis(sorted_df[metric] / sorted_df[metric].max())
-    ax2.barh(
-        [f"#{r['experiment_id']:02d}\nlr={r['learning_rate']}\nwd={r['weight_decay']}"
-         for _, r in sorted_df.iterrows()],
-        sorted_df[metric].values,
-        color=colors, edgecolor='white',
-    )
-    ax2.set_xlabel(f'{metric} (%)')
-    ax2.set_title('Task3: All Experiments Ranked by Accuracy')
-    ax2.grid(True, alpha=0.3, axis='x')
-    plt.tight_layout()
-    plt.savefig(save_path / f'{figure_prefix}_ranked_bar.pdf',
-                dpi=150, bbox_inches='tight')
-    plt.show()
-    print(f"Saved: {save_path / f'{figure_prefix}_ranked_bar.pdf'}")
 
 
 def _has_dropout(model: nn.Module) -> bool:
