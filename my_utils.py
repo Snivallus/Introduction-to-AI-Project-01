@@ -24,7 +24,7 @@ import torchvision.transforms as transforms
 from torchvision.transforms import RandomApply
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+from sklearn.metrics import precision_recall_fscore_support
 
 CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_10_STD = (0.2470, 0.2435, 0.2616)
@@ -408,14 +408,11 @@ def format_parameters(count: int, decimals: int) -> str:
         >>> format_parameters(123456)
         '123.456K'
     """
-    if count >= 1e9:
-        return f"{count / 1e9:.{decimals}f}B".rstrip('0').rstrip('.') + 'B'
-    elif count >= 1e6:
-        return f"{count / 1e6:.{decimals}f}M".rstrip('0').rstrip('.') + 'M'
-    elif count >= 1e3:
-        return f"{count / 1e3:.{decimals}f}K".rstrip('0').rstrip('.') + 'K'
-    else:
-        return str(count)
+    for threshold, suffix in [(1e9, 'B'), (1e6, 'M'), (1e3, 'K')]:
+        if count >= threshold:
+            value = count / threshold
+            return f"{value:.{decimals}f}".rstrip('0').rstrip('.') + suffix
+    return str(count)
 
 
 def create_learning_rate_scheduler(
@@ -574,28 +571,9 @@ def compute_per_class_metrics(
         Dict mapping class name to ``{'precision', 'recall', 'f1'}``.
     """
     num_classes = len(class_names)
-
-    try:
-        from sklearn.metrics import precision_recall_fscore_support
-        prec, rec, f1, _ = precision_recall_fscore_support(
-            targets, predictions, labels=range(num_classes), zero_division=0
-        )
-    except ImportError:
-        prec = np.zeros(num_classes)
-        rec = np.zeros(num_classes)
-        f1 = np.zeros(num_classes)
-        for i in range(num_classes):
-            tp = ((predictions == i) & (targets == i)).sum()
-            fp = ((predictions == i) & (targets != i)).sum()
-            fn = ((predictions != i) & (targets == i)).sum()
-            prec[i] = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            rec[i] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1[i] = (
-                2 * prec[i] * rec[i] / (prec[i] + rec[i])
-                if (prec[i] + rec[i]) > 0
-                else 0.0
-            )
-
+    prec, rec, f1, _ = precision_recall_fscore_support(
+        targets, predictions, labels=range(num_classes), zero_division=0
+    )
     return {
         name: {
             'precision': float(p),
