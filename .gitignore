@@ -37,6 +37,7 @@ models/
 DEVELOP_PLAN.md
 
 # Claude Code files
+.claude/
 CLAUDE.md
 CODING_STYLE.md
 example_cnn.py
