@@ -15,12 +15,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
+import torchvision
 import torchvision.transforms as transforms
 from torchvision.transforms import RandomApply
 import matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.metrics import precision_recall_fscore_support
+from contextlib import redirect_stdout
 from typing import (
     Any,
     Dict,
@@ -33,6 +35,59 @@ from typing import (
 CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_10_STD = (0.2470, 0.2435, 0.2616)
 CIFAR_10_CLASS = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+
+class LeNet(nn.Module):
+    """LeNet-style CNN for CIFAR-10 image classification.
+
+    Original architecture adapted for 32x32 RGB images.
+    Consists of two convolutional layers and three fully connected layers.
+    """
+
+    def __init__(self, dropout: Optional[float] = None) -> None:
+        super(LeNet, self).__init__()
+
+        # Convolutional layer: 3 input channels (RGB), 6 output channels, 5x5 kernel
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        # Convolutional layer: 6 input channels, 16 output channels, 5x5 kernel
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        # Fully connected layers: y = Wx + b
+        self.fc1   = nn.Linear(16*5*5, 120)
+        self.fc2   = nn.Linear(120, 84)
+        self.fc3   = nn.Linear(84, 10)
+        # Optional dropout layer for regularization
+        self.dropout = None
+        if dropout is not None:
+            if isinstance(dropout, float) and 0 < dropout < 1:
+                self.dropout = nn.Dropout(dropout)
+            else:
+                raise ValueError("dropout must be a float between 0 and 1")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the network.
+
+        Args:
+            x: Input tensor of shape (batch_size, 3, 32, 32).
+
+        Returns:
+            Output tensor of shape (batch_size, 10).
+        """
+        # [batch_size, 3, 32, 32] -> conv1 -> [batch_size, 6, 28, 28] -> relu -> maxpool -> [batch_size, 6, 14, 14]
+        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
+        # [batch_size, 6, 14, 14] -> conv2 -> [batch_size, 16, 10, 10] -> relu -> maxpool -> [batch_size, 16, 5, 5]
+        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+        # Flatten: [batch_size, 16 * 5 * 5] = [batch_size, 400]
+        x = x.view(x.size()[0], -1)
+        # [batch_size, 400] -> fc1 -> [batch_size, 120]
+        x = F.relu(self.fc1(x))
+        # [batch_size, 120] -> dropout (optional) -> [batch_size, 120]
+        if self.dropout is not None:
+            x = self.dropout(x)
+        # [batch_size, 120] -> fc2 -> [batch_size, 84]
+        x = F.relu(self.fc2(x))
+        # [batch_size, 84] -> fc3 -> [batch_size, 10]
+        x = self.fc3(x)
+        return x
 
 
 def get_device(use_cuda: bool = True) -> torch.device:
@@ -500,8 +555,259 @@ def create_learning_rate_scheduler(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Comprehensive Evaluation: Beyond Top-1 Accuracy
+# Task3: Hyperparameter Tuning Helpers
 # ═══════════════════════════════════════════════════════════════════════
+
+
+def train_experiment(
+    exp_idx: int,
+    lr: float,
+    wd: float,
+    ls: float,
+    bs: int,
+    dropout_rate: float,
+    train_indices: List[int],
+    val_indices: List[int],
+    num_epochs: int,
+    ckpt_dir: str,
+    log_dir: str,
+) -> Dict[str, Any]:
+    """Train a single LeNet with dropout for Task3 hyperparameter tuning.
+
+    Each call creates a fresh model, data loaders, optimizer, and trains
+    independently.  Training progress is written to a log file inside
+    ``log_dir``.  After training, evaluates on the CIFAR-10 test set via
+    :func:`evaluate` and records the test accuracy.
+
+    Args:
+        exp_idx: Experiment index (1-based) for checkpoint/log naming.
+        lr: Learning rate.
+        wd: Weight decay (L2 regularization).
+        ls: Label smoothing epsilon.
+        bs: Batch size.
+        dropout_rate: Dropout probability (passed to :class:`LeNet`).
+        train_indices: Indices into the full CIFAR-10 training set for
+            training samples.
+        val_indices: Indices into the full CIFAR-10 training set for
+            validation samples.
+        num_epochs: Maximum number of training epochs.
+        ckpt_dir: Directory for model checkpoints.
+        log_dir: Directory for training log files.
+
+    Returns:
+        Dict with keys: ``experiment_id``, ``learning_rate``, ``weight_decay``,
+        ``label_smoothing``, ``batch_size``, ``dropout_rate``,
+        ``best_val_accuracy``, ``test_accuracy``, ``final_train_loss``,
+        ``epochs_trained``, ``optimizer``, ``log_file``.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Data transforms (light augmentation — same as notebook setup)
+    transform_train, transform_test = get_cifar10_data_augmentation(style="light")
+
+    # Load CIFAR-10 (already downloaded by the main notebook process)
+    trainset = torchvision.datasets.CIFAR10(
+        root="./dataset", train=True, download=False, transform=transform_train
+    )
+    valset = torchvision.datasets.CIFAR10(
+        root="./dataset", train=True, download=False, transform=transform_test
+    )
+    testset = torchvision.datasets.CIFAR10(
+        root="./dataset", train=False, download=False, transform=transform_test
+    )
+
+    train_loader = DataLoader(
+        Subset(trainset, train_indices),
+        batch_size=bs,
+        shuffle=True,
+        num_workers=1,
+    )
+    val_loader = DataLoader(
+        Subset(valset, val_indices),
+        batch_size=bs,
+        shuffle=False,
+        num_workers=1,
+    )
+    test_loader = DataLoader(
+        testset, batch_size=bs, shuffle=False, num_workers=1,
+    )
+
+    # Fresh LeNet model with dropout for all Task3 experiments
+    model = LeNet(dropout=dropout_rate).to(device)
+
+    # Adam optimizer with L2 regularization via weight_decay
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+    criterion = nn.CrossEntropyLoss(label_smoothing=ls)
+
+    # Cosine annealing scheduler with linear warm-up
+    scheduler_config = create_learning_rate_scheduler(
+        optimizer,
+        scheduler_type="cosine",
+        total_epochs=num_epochs,
+        initial_lr=lr,
+    )
+
+    log_file = Path(log_dir) / f"exp_{exp_idx:02d}_lr{lr}_wd{wd}_ls{ls}_bs{bs}.log"
+
+    # Train with stdout redirected to the log file
+    with open(log_file, "w") as f:
+        with redirect_stdout(f):
+            train_losses, val_accuracies = train_model(
+                model=model,
+                train_loader=train_loader,
+                criterion=criterion,
+                optimizer=optimizer,
+                num_epochs=num_epochs,
+                save_path=str(Path(ckpt_dir) / f"exp_{exp_idx:02d}"),
+                val_loader=val_loader,
+                early_stopping_patience=10,
+                gradient_clip=1.0,
+                scheduler_config=scheduler_config,
+            )
+
+    best_val_acc = max(val_accuracies) if val_accuracies else 0.0
+    final_loss = train_losses[-1] if train_losses else float("inf")
+    epochs_done = len(train_losses)
+
+    # Evaluate on test set using my_utils.evaluate
+    test_result = evaluate(
+        model, test_loader, device,
+        model_name=f"exp_{exp_idx:02d}",
+        verbose=False,
+        skip_mc_dropout=True,
+    )
+    test_accuracy = test_result['accuracy']
+
+    return {
+        "experiment_id": exp_idx,
+        "learning_rate": lr,
+        "weight_decay": wd,
+        "label_smoothing": ls,
+        "batch_size": bs,
+        "dropout_rate": dropout_rate,
+        "best_val_accuracy": best_val_acc,
+        "test_accuracy": test_accuracy,
+        "final_train_loss": final_loss,
+        "epochs_trained": epochs_done,
+        "optimizer": "Adam",
+        "log_file": str(log_file),
+    }
+
+
+def plot_task3_hyperparameter_effects(
+    results_df: "pd.DataFrame",
+    save_dir: str = 'figures',
+    figure_prefix: str = 'task3',
+    metric: str = 'test_accuracy',
+) -> None:
+    """Plot line charts showing each hyperparameter's systematic effect on accuracy.
+
+    For each hyperparameter (learning_rate, weight_decay, label_smoothing,
+    batch_size), creates a figure with:
+    - A line connecting the mean accuracy across all combinations at each
+      parameter value
+    - Error bars showing ±1 standard deviation
+    - Individual experiment results overlaid as scatter points
+
+    Args:
+        results_df: DataFrame containing experiment results. Must include
+            columns ``learning_rate``, ``weight_decay``, ``label_smoothing``,
+            ``batch_size``, and the column specified by ``metric``.
+        save_dir: Directory to save the output PDF plots.
+        figure_prefix: Prefix for output filenames.
+        metric: Column name in ``results_df`` holding the accuracy metric
+            to plot (default ``'test_accuracy'``).
+    """
+    import pandas as pd
+
+    save_path = Path(save_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    param_configs = [
+        ('learning_rate', 'Learning Rate'),
+        ('weight_decay', 'Weight Decay'),
+        ('label_smoothing', 'Label Smoothing'),
+        ('batch_size', 'Batch Size'),
+    ]
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes = axes.flatten()
+
+    for ax, (param_col, param_label) in zip(axes, param_configs):
+        if param_col not in results_df.columns:
+            ax.text(0.5, 0.5, f"No data for\n{param_col}",
+                    ha='center', va='center', transform=ax.transAxes)
+            ax.set_title(f'Effect of {param_label}')
+            continue
+
+        # Group by parameter value and compute statistics
+        grouped = results_df.groupby(param_col)[metric]
+        means = grouped.mean()
+        stds = grouped.std()
+
+        # X-axis positions
+        x = range(len(means))
+
+        # Line plot with error bars
+        ax.errorbar(
+            x, means.values, yerr=stds.values,
+            fmt='-o', capsize=5, capthick=2, linewidth=2,
+            markersize=8, color='#2196F3', ecolor='#FF5722',
+            label=f'Mean ± Std',
+        )
+
+        # Overlay individual points with small jitter
+        for xi, (val, group) in enumerate(grouped):
+            jitter = np.random.default_rng(42).uniform(-0.05, 0.05, len(group))
+            ax.scatter(
+                xi + jitter, group.values,
+                alpha=0.5, color='#FF5722', zorder=5, s=30,
+                label='Individual' if xi == 0 else '',
+            )
+
+        # Format tick labels
+        tick_labels = []
+        for v in means.index:
+            if isinstance(v, float) and v < 0.001:
+                tick_labels.append(f'{v:.1e}')
+            elif isinstance(v, float):
+                tick_labels.append(f'{v:.4f}')
+            else:
+                tick_labels.append(str(v))
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(tick_labels)
+        ax.set_xlabel(param_label)
+        ax.set_ylabel('Accuracy (%)')
+        ax.set_title(f'Effect of {param_label} on {metric}')
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    plt.suptitle('Task3: Hyperparameter Effect Analysis', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(save_path / f'{figure_prefix}_hyperparameter_effects.pdf',
+                dpi=150, bbox_inches='tight')
+    plt.show()
+    print(f"Saved: {save_path / f'{figure_prefix}_hyperparameter_effects.pdf'}")
+
+    # ── Also save a ranked bar chart for quick reference ──
+    fig2, ax2 = plt.subplots(figsize=(10, max(4, len(results_df) * 0.25)))
+    sorted_df = results_df.sort_values(metric, ascending=True)
+    colors = plt.cm.viridis(sorted_df[metric] / sorted_df[metric].max())
+    ax2.barh(
+        [f"#{r['experiment_id']:02d}\nlr={r['learning_rate']}\nwd={r['weight_decay']}"
+         for _, r in sorted_df.iterrows()],
+        sorted_df[metric].values,
+        color=colors, edgecolor='white',
+    )
+    ax2.set_xlabel(f'{metric} (%)')
+    ax2.set_title('Task3: All Experiments Ranked by Accuracy')
+    ax2.grid(True, alpha=0.3, axis='x')
+    plt.tight_layout()
+    plt.savefig(save_path / f'{figure_prefix}_ranked_bar.pdf',
+                dpi=150, bbox_inches='tight')
+    plt.show()
+    print(f"Saved: {save_path / f'{figure_prefix}_ranked_bar.pdf'}")
 
 
 def _has_dropout(model: nn.Module) -> bool:
@@ -936,6 +1242,7 @@ def evaluate(
     plot_dir: str = 'figures',
     n_bins_ece: int = 10,
     mc_dropout_samples: int = 20,
+    skip_mc_dropout: bool = False,
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """Comprehensive evaluation of a CIFAR-10 classifier.
@@ -963,7 +1270,11 @@ def evaluate(
         plot_dir: Directory for saved plots.
         n_bins_ece: Number of confidence bins for ECE computation.
         mc_dropout_samples: Number of stochastic forward passes for MC
-            Dropout (ignored if the model has no dropout).
+            Dropout (ignored if the model has no dropout or
+            ``skip_mc_dropout=True``).
+        skip_mc_dropout: If ``True``, skip MC Dropout evaluation even if
+            the model has dropout layers.  Useful for bulk evaluation
+            during hyperparameter tuning.
         verbose: If ``True``, print a results summary.
 
     Returns:
@@ -1028,7 +1339,7 @@ def evaluate(
 
     # ── 8. MC Dropout ────────────────────────────────────────────────
     dropout_result: Optional[Dict[str, Any]] = None
-    if _has_dropout(model):
+    if _has_dropout(model) and not skip_mc_dropout:
         if verbose:
             print("\n[MC Dropout] Evaluating uncertainty ...")
         dropout_result = mc_dropout_evaluate(
