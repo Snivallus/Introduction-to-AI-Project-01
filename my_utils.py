@@ -500,9 +500,15 @@ class CosineAnnealingWarmRestartsDecay(CosineAnnealingWarmRestarts):
         # Delegate to parent
         super().step(epoch)
 
-        # Detect restart: T_cur was reset to 0 after reaching T_i
+        # Detect restart: T_cur was reset to 0 after reaching T_i.
+        # super().step() above already set the optimizer LR using the
+        # undecayed base_lrs.  We must re-apply with the decayed values
+        # so the current epoch immediately reflects the lower peak.
         if self.T_cur < old_T_cur:
             self.base_lrs = [lr * self.cycle_decay for lr in self.base_lrs]
+            for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+                param_group['lr'] = lr
+            self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
             self._restart_count += 1
 
     def get_restart_count(self) -> int:
