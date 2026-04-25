@@ -109,9 +109,14 @@ class MyCNN(nn.Module):
 
     Implements a deeper architecture with residual blocks, batch normalization,
     and adaptive average pooling. Designed for 32x32 RGB input images.
+
+    Args:
+        num_classes: Number of output classes (default: 10).
+        dropout: Optional dropout rate (float between 0 and 1). 
+                 If None, no dropout is applied. Default: None.
     """
 
-    def __init__(self, num_classes=10, dropout_rate=0.5):
+    def __init__(self, num_classes: int = 10, dropout: Optional[float] = None):
         super().__init__()
         # Initial convolution: [batch, 3, 32, 32] -> [batch, 64, 32, 32]
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -128,8 +133,13 @@ class MyCNN(nn.Module):
         self.layer4 = self._make_layer(512, 2, stride=2)
         # Global pooling: [batch, 512, 4, 4] -> [batch, 512, 1, 1]
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # Dropout for regularization
-        self.dropout = nn.Dropout(p=dropout_rate)
+        # Optional dropout for regularization
+        self.dropout = None
+        if dropout is not None:
+            if isinstance(dropout, float) and 0 < dropout < 1:
+                self.dropout = nn.Dropout(dropout)
+            else:
+                raise ValueError("dropout must be a float between 0 and 1")
         # Classifier: [batch, 512] -> [batch, num_classes]
         self.fc = nn.Linear(512 * BasicBlock.expansion, num_classes)
 
@@ -173,8 +183,9 @@ class MyCNN(nn.Module):
         x = self.avgpool(x)
         # [batch, 512, 1, 1] -> flatten -> [batch, 512]
         x = torch.flatten(x, 1)
-        # [batch, 512] -> dropout -> [batch, 512]
-        x = self.dropout(x)
+        # [batch, 512] -> dropout (optional)
+        if self.dropout is not None:
+            x = self.dropout(x)
         # [batch, 512] -> fc -> [batch, num_classes]
         x = self.fc(x)
         return x

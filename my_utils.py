@@ -131,7 +131,7 @@ def train_model(
     val_loader: Optional[DataLoader] = None,
     early_stopping_patience: Optional[int] = None,
     gradient_clip: Optional[float] = 1.0,
-    print_every: int = 1000,
+    print_every: Optional[int] = None,
     scheduler_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[List[float], Optional[List[float]]]:
     """Train a neural network model with optional validation and early stopping.
@@ -144,10 +144,9 @@ def train_model(
         num_epochs: Number of training epochs.
         save_path: Directory to save model checkpoints.
         val_loader: DataLoader for validation data (optional).
-        early_stopping_patience: Number of epochs to wait for improvement
-            before early stopping (optional).
+        early_stopping_patience: Number of epochs to wait for improvement before early stopping (optional).
         gradient_clip: Maximum gradient norm for clipping (optional).
-        print_every: Print training status every N batches.
+        print_every: Print training status every N batches (optional).
         scheduler_config: Dict returned by
             :func:`create_learning_rate_scheduler`. If provided, applies
             linear LR warm-up for the first ``warmup_epochs`` epochs, then
@@ -219,7 +218,7 @@ def train_model(
                 old_lr = optimizer.param_groups[0]['lr']
                 scheduler.step()
                 new_lr = optimizer.param_groups[0]['lr']
-                if new_lr > old_lr * 1.5:
+                if new_lr > old_lr:
                     restart_count += 1
                     print(f"  >> Cosine annealing restart #{restart_count}: LR {old_lr:.6f} -> {new_lr:.6f}")
 
@@ -259,7 +258,7 @@ def train_model(
             total_batches += 1
 
             # Print training status
-            if i % print_every == print_every - 1:
+            if print_every is not None and i % print_every == print_every - 1:
                 avg_loss = running_loss / total_batches
                 print(f'Epoch {epoch+1}: batch {i+1:5d} loss: {avg_loss:.3f}')
 
@@ -451,7 +450,8 @@ def create_learning_rate_scheduler(
     initial_lr: float = 0.001,
     min_lr: float = 1e-6,
     T_0: Optional[int] = None,
-    T_mult: int = 2
+    T_mult: int = 2,
+    gamma: float = 0.1
 ) -> Dict[str, Any]:
     """Create a learning rate scheduler with linear warm-up configuration.
 
@@ -464,13 +464,12 @@ def create_learning_rate_scheduler(
         optimizer: Optimizer to schedule.
         scheduler_type: Type of scheduler ('cosine', 'step').
         total_epochs: Total number of training epochs.
-        warmup_epochs: Number of warm-up epochs. If None, defaults to
-            min(5, max(2, 10% of total_epochs)).
+        warmup_epochs: Number of warm-up epochs. If None, defaults to min(5, max(2, 10% of total_epochs)).
         initial_lr: Initial learning rate (used to scale warm-up).
         min_lr: Minimum learning rate (eta_min).
-        T_0: Period for first restart in epochs. If None, defaults to
-            total_epochs // 2.
+        T_0: Period for first restart in epochs. If None, defaults to total_epochs // 2.
         T_mult: Multiplication factor for T_0 after each restart.
+        gamma: Multiplicative factor for step LR scheduler (if scheduler_type='step').
 
     Returns:
         Dictionary with keys:
@@ -509,8 +508,8 @@ def create_learning_rate_scheduler(
         elif scheduler_type == 'step':
             from torch.optim.lr_scheduler import StepLR
             step_size = max(1, total_epochs // 3)
-            scheduler = StepLR(optimizer, step_size=step_size, gamma=0.1)
-            scheduler_desc = f"StepLR (step_size={step_size}, gamma=0.1)"
+            scheduler = StepLR(optimizer, step_size=step_size, gamma={gamma})
+            scheduler_desc = f"StepLR (step_size={step_size}, gamma={gamma})"
         else:
             raise ValueError(f"Unknown scheduler type: {scheduler_type}")
 
@@ -572,58 +571,60 @@ def train_experiment(
         ``best_val_accuracy``, ``test_accuracy``, ``final_train_loss``,
         ``epochs_trained``, ``optimizer``, ``log_file``.
     """
-    # Move model to device
-    device = get_device()
-    model = LeNet(dropout=dropout).to(device)
-
-    # Data transforms (light augmentation — same as notebook setup)
-    transform_train, transform_test = get_cifar10_data_augmentation(style="light")
-
-    # Load CIFAR-10 (already downloaded by the main notebook process)
-    trainset = torchvision.datasets.CIFAR10(
-        root="./dataset", train=True, download=False, transform=transform_train
-    )
-    valset = torchvision.datasets.CIFAR10(
-        root="./dataset", train=True, download=False, transform=transform_test
-    )
-    testset = torchvision.datasets.CIFAR10(
-        root="./dataset", train=False, download=False, transform=transform_test
-    )
-
-    train_loader = DataLoader(
-        Subset(trainset, train_indices),
-        batch_size=bs,
-        shuffle=True,
-        num_workers=1,
-    )
-    val_loader = DataLoader(
-        Subset(valset, val_indices),
-        batch_size=bs,
-        shuffle=False,
-        num_workers=1,
-    )
-    test_loader = DataLoader(
-        testset, batch_size=bs, shuffle=False, num_workers=1,
-    )
-
-    # Adam optimizer with L2 regularization via weight_decay
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
-    criterion = nn.CrossEntropyLoss(label_smoothing=ls)
-
-    # Cosine annealing scheduler with linear warm-up
-    scheduler_config = create_learning_rate_scheduler(
-        optimizer,
-        scheduler_type="cosine",
-        total_epochs=num_epochs,
-        initial_lr=lr,
-        T_0=T_0
-    )
-
     log_file = Path(log_dir) / f"exp_{exp_idx:02d}_lr{lr}_wd{wd}_ls{ls}_bs{bs}.log"
 
-    # Train with stdout redirected to the log file
+    # Redirect stdout to the log file
     with open(log_file, "w") as f:
         with redirect_stdout(f):
+
+            # Move model to device
+            device = get_device()
+            model = LeNet(dropout=dropout).to(device)
+
+            # Data transforms (light augmentation — same as notebook setup)
+            transform_train, transform_test = get_cifar10_data_augmentation(style="light")
+
+            # Load CIFAR-10 (already downloaded by the main notebook process)
+            trainset = torchvision.datasets.CIFAR10(
+                root="./dataset", train=True, download=False, transform=transform_train
+            )
+            valset = torchvision.datasets.CIFAR10(
+                root="./dataset", train=True, download=False, transform=transform_test
+            )
+            testset = torchvision.datasets.CIFAR10(
+                root="./dataset", train=False, download=False, transform=transform_test
+            )
+
+            train_loader = DataLoader(
+                Subset(trainset, train_indices),
+                batch_size=bs,
+                shuffle=True,
+                num_workers=1,
+            )
+            val_loader = DataLoader(
+                Subset(valset, val_indices),
+                batch_size=bs,
+                shuffle=False,
+                num_workers=1,
+            )
+            test_loader = DataLoader(
+                testset, batch_size=bs, shuffle=False, num_workers=1,
+            )
+
+            # Adam optimizer with L2 regularization via weight_decay
+            optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+            criterion = nn.CrossEntropyLoss(label_smoothing=ls)
+
+            # Cosine annealing scheduler with linear warm-up
+            scheduler_config = create_learning_rate_scheduler(
+                optimizer,
+                scheduler_type="cosine",
+                total_epochs=num_epochs,
+                initial_lr=lr,
+                T_0=T_0
+            )
+
+            # Train model and record training losses and validation accuracies
             train_losses, val_accuracies = train_model(
                 model=model,
                 train_loader=train_loader,
@@ -637,18 +638,18 @@ def train_experiment(
                 scheduler_config=scheduler_config,
             )
 
-    best_val_acc = max(val_accuracies) if val_accuracies else 0.0
-    final_loss = train_losses[-1] if train_losses else float("inf")
-    epochs_done = len(train_losses)
+            best_val_acc = max(val_accuracies) if val_accuracies else 0.0
+            final_loss = train_losses[-1] if train_losses else float("inf")
+            epochs_done = len(train_losses)
 
-    # Evaluate on test set using my_utils.evaluate
-    test_result = evaluate(
-        model, test_loader, device,
-        model_name=f"exp_{exp_idx:02d}",
-        verbose=False,
-        skip_mc_dropout=True,
-    )
-    test_accuracy = test_result['accuracy']
+            # Evaluate on test set using my_utils.evaluate
+            test_result = evaluate(
+                model, test_loader, device,
+                model_name=f"exp_{exp_idx:02d}",
+                verbose=False,
+                skip_mc_dropout=True,
+            )
+            test_accuracy = test_result['accuracy']
 
     return {
         "experiment_id": exp_idx,
