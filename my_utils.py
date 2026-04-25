@@ -96,25 +96,27 @@ def get_cifar10_data_augmentation(
         # Gentle augmentation: flips and crops only.
         # Heavier transforms (ColorJitter, Rotation, RandomErasing) are too
         # aggressive for small models like LeNet (~60K params).
+        P = 0.05
         transform_train = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.1),
-            transforms.RandomVerticalFlip(p=0.1),
-            RandomApply([transforms.RandomCrop(32, padding=4)], p=0.1),
+            transforms.RandomHorizontalFlip(p=P),
+            transforms.RandomVerticalFlip(p=P),
+            RandomApply([transforms.RandomCrop(32, padding=4)], p=P),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
         ])
     elif style == 'full':
         # Aggressive augmentation suitable for large-capacity models.
+        P = 0.1
         transform_train = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            RandomApply([transforms.RandomCrop(32, padding=4)], p=0.5),
-            RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=0.5),
-            RandomApply([transforms.RandomRotation(30)], p=0.5),
+            transforms.RandomHorizontalFlip(p=P),
+            transforms.RandomVerticalFlip(p=P),
+            RandomApply([transforms.RandomCrop(32, padding=4)], p=P),
+            RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=P),
+            RandomApply([transforms.RandomRotation(30)], p=P),
             transforms.ToTensor(),
             transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
-            RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))], p=0.5)
+            transforms.RandomErasing(p=P, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
+            RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))], p=P)
         ])
     else:
         raise ValueError(f"Unknown style: '{style}'. Use 'light' or 'full'.")
@@ -611,6 +613,7 @@ def train_experiment(
     val_indices: List[int],
     num_epochs: int,
     T_0: int,
+    cycle_decay: float,
     ckpt_dir: str,
     log_dir: str,
 ) -> Dict[str, Any]:
@@ -627,12 +630,11 @@ def train_experiment(
         wd: Weight decay (L2 regularization).
         ls: Label smoothing epsilon.
         bs: Batch size.
-        train_indices: Indices into the full CIFAR-10 training set for
-            training samples.
-        val_indices: Indices into the full CIFAR-10 training set for
-            validation samples.
+        train_indices: Indices into the full CIFAR-10 training set for training samples.
+        val_indices: Indices into the full CIFAR-10 training set for validation samples.
         num_epochs: Maximum number of training epochs.
         T_0: Number of epochs for the first cosine annealing restart.
+        cycle_decay: Factor to decay the learning rate at each cosine restart (0.1 to 1.0).
         ckpt_dir: Directory for model checkpoints.
         log_dir: Directory for training log files.
 
@@ -692,7 +694,8 @@ def train_experiment(
                 scheduler_type="cosine",
                 total_epochs=num_epochs,
                 initial_lr=lr,
-                T_0=T_0
+                T_0=T_0,
+                cycle_decay=cycle_decay
             )
 
             # Train model and record training losses and validation accuracies
