@@ -96,27 +96,27 @@ def get_cifar10_data_augmentation(
         # Gentle augmentation: flips and crops only.
         # Heavier transforms (ColorJitter, Rotation, RandomErasing) are too
         # aggressive for small models like LeNet (~60K params).
-        P = 0.05
-        transform_train = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=P),
-            transforms.RandomVerticalFlip(p=P),
-            RandomApply([transforms.RandomCrop(32, padding=4)], p=P),
-            transforms.ToTensor(),
-            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-        ])
-    elif style == 'full':
-        # Aggressive augmentation suitable for large-capacity models.
         P = 0.1
         transform_train = transforms.Compose([
             transforms.RandomHorizontalFlip(p=P),
-            transforms.RandomVerticalFlip(p=P),
-            RandomApply([transforms.RandomCrop(32, padding=4)], p=P),
-            RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=P),
-            RandomApply([transforms.RandomRotation(30)], p=P),
+            # transforms.RandomVerticalFlip(p=P),  # Vertical flips are less common for natural images, so we omit them. 
+            RandomApply([transforms.RandomCrop(32, padding=4, padding_mode='reflect')], p=P),
             transforms.ToTensor(),
-            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD),
-            transforms.RandomErasing(p=P, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
-            RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))], p=P)
+            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD)
+        ])
+    elif style == 'full':
+        # Aggressive augmentation suitable for large-capacity models.
+        P = 0.2
+        transform_train = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=P),
+            # transforms.RandomVerticalFlip(p=P),  # Vertical flips are less common for natural images, so we omit them. 
+            RandomApply([transforms.RandomCrop(32, padding=4, padding_mode='reflect')], p=P),
+            RandomApply([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=P),
+            transforms.ToTensor(),
+            RandomApply([transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.2, 0.5))], p=P),
+            RandomApply([transforms.RandomRotation(5, fill=tuple(CIFAR_10_MEAN))], p=P),
+            transforms.RandomErasing(p=P, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=tuple(CIFAR_10_MEAN)),
+            transforms.Normalize(CIFAR_10_MEAN, CIFAR_10_STD)
         ])
     else:
         raise ValueError(f"Unknown style: '{style}'. Use 'light' or 'full'.")
@@ -313,6 +313,16 @@ def train_model(
 
     print('Finished Training')
 
+    # Identify best epoch based on validation accuracy (if available) and print summary
+    if val_accuracies:
+        best_idx = val_accuracies.index(max(val_accuracies))
+        best_epoch = best_idx + 1
+        best_train_loss = train_losses[best_idx]
+        print(
+            f"Best validation accuracy: {val_accuracies[best_idx]:.2f}% "
+            f"at epoch {best_epoch} with train loss: {best_train_loss:.4f}"
+        )
+
     return train_losses, val_accuracies
 
 
@@ -506,7 +516,9 @@ class CosineAnnealingWarmRestartsDecay(CosineAnnealingWarmRestarts):
         # so the current epoch immediately reflects the lower peak.
         if self.T_cur < old_T_cur:
             self.base_lrs = [lr * self.cycle_decay for lr in self.base_lrs]
-            for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+            # At T_cur=0, get_lr() returns base_lrs (cos(0)=1), so
+            # assign directly to avoid the "use get_last_lr()" warning.
+            for param_group, lr in zip(self.optimizer.param_groups, self.base_lrs):
                 param_group['lr'] = lr
             self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
             self._restart_count += 1
@@ -618,7 +630,9 @@ def train_experiment(
     train_indices: List[int],
     val_indices: List[int],
     num_epochs: int,
+    min_lr: float,
     T_0: int,
+    T_mult: int,
     cycle_decay: float,
     ckpt_dir: str,
     log_dir: str,
@@ -640,6 +654,7 @@ def train_experiment(
         val_indices: Indices into the full CIFAR-10 training set for validation samples.
         num_epochs: Maximum number of training epochs.
         T_0: Number of epochs for the first cosine annealing restart.
+        T_mult: Multiplication factor for T_0 after each restart.
         cycle_decay: Factor to decay the learning rate at each cosine restart (0.1 to 1.0).
         ckpt_dir: Directory for model checkpoints.
         log_dir: Directory for training log files.
@@ -700,7 +715,9 @@ def train_experiment(
                 scheduler_type="cosine",
                 total_epochs=num_epochs,
                 initial_lr=lr,
+                min_lr=min_lr,
                 T_0=T_0,
+                T_mult=T_mult,
                 cycle_decay=cycle_decay
             )
 
@@ -835,8 +852,7 @@ def plot_task3_hyperparameter_effects(
 
     plt.suptitle('Task3: Hyperparameter Effect Analysis', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(save_path / f'{figure_prefix}_hyperparameter_effects.pdf',
-                dpi=150, bbox_inches='tight')
+    plt.savefig(save_path / f'{figure_prefix}_hyperparameter_effects.pdf', dpi=300, bbox_inches='tight')
     plt.show()
     print(f"Saved: {save_path / f'{figure_prefix}_hyperparameter_effects.pdf'}")
 
@@ -1274,7 +1290,7 @@ def evaluate(
     n_bins_ece: int = 10,
     mc_dropout_samples: int = 20,
     skip_mc_dropout: bool = False,
-    verbose: bool = True,
+    verbose: bool = False,
 ) -> Dict[str, Any]:
     """Comprehensive evaluation of a CIFAR-10 classifier.
 
@@ -1411,7 +1427,7 @@ def evaluate(
         print(f"  Accuracy:                       {accuracy:.2f}%")
         print(f"  Average F1:                     {avg_f1:.4f}")
         print(f"  ECE (calibration error):        {ece:.4f}")
-        print(f"  Pred distribution KL:            {kl_div:.6f}")
+        print(f"  Pred distribution KL:           {kl_div:.6f}")
         if dropout_result:
             print(f"  MC Dropout ({mc_dropout_samples} samples):")
             print(f"    Avg predictive variance:      {dropout_result['variance_mean']:.6f}")
