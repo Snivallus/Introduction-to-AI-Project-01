@@ -32,6 +32,7 @@ from typing import (
     Tuple
 )
 from my_model import LeNet
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 
 CIFAR_10_MEAN = (0.4914, 0.4822, 0.4465)
@@ -442,6 +443,64 @@ def format_parameters(count: int, decimals: int) -> str:
     return str(count)
 
 
+class CosineAnnealingWarmRestartsDecay(CosineAnnealingWarmRestarts):
+    """Cosine annealing scheduler with decaying restarts.
+
+    Extends :class:`torch.optim.lr_scheduler.CosineAnnealingWarmRestarts`
+    by multiplying the base learning rates by ``cycle_decay`` each time
+    a restart occurs.  This ensures each cycle starts with a lower peak
+    LR, helping stabilise late-stage training in deep models.
+
+    Args:
+        optimizer: Wrapped optimizer.
+        T_0: Number of epochs for the first restart.
+        T_mult: Multiplication factor for T_0 after each restart.
+        eta_min: Minimum learning rate.
+        last_epoch: The index of the last epoch.
+        cycle_decay: Factor multiplied into ``base_lrs`` at each restart.
+            Clamped to ``[0.1, 1.0]``.  Default ``1.0`` (no decay).
+    """
+    def __init__(
+        self,
+        optimizer: optim.Optimizer,
+        T_0: int,
+        T_mult: int = 2,
+        eta_min: float = 0.0,
+        last_epoch: int = -1,
+        cycle_decay: float = 1.0,
+    ) -> None:
+        if cycle_decay < 0.1 or cycle_decay > 1.0:
+            import warnings
+            warnings.warn(
+                f"cycle_decay={cycle_decay} is outside [0.1, 1.0]; "
+                f"clamping to {max(0.1, min(1.0, cycle_decay))}"
+            )
+        self.cycle_decay = max(0.1, min(1.0, cycle_decay))
+        self._restart_count = 0
+        super().__init__(optimizer, T_0, T_mult, eta_min, last_epoch)
+
+    def step(self, epoch: Optional[int] = None) -> None:
+        # First call: delegate without decay logic
+        if self.last_epoch == -1:
+            super().step(epoch)
+            return
+
+        # Snapshot before stepping
+        old_T_cur = self.T_cur
+
+        # Delegate to parent
+        super().step(epoch)
+
+        # Detect restart: T_cur was reset to 0 after reaching T_i
+        if self.T_cur < old_T_cur:
+            self.base_lrs = [lr * self.cycle_decay for lr in self.base_lrs]
+            self._restart_count += 1
+
+    def get_restart_count(self) -> int:
+        """Return the number of restarts that have occurred."""
+        return self._restart_count
+
+
 def create_learning_rate_scheduler(
     optimizer: optim.Optimizer,
     scheduler_type: str = 'cosine',
@@ -451,7 +510,8 @@ def create_learning_rate_scheduler(
     min_lr: float = 1e-6,
     T_0: Optional[int] = None,
     T_mult: int = 2,
-    gamma: float = 0.1
+    gamma: float = 0.1,
+    cycle_decay: float = 1.0,
 ) -> Dict[str, Any]:
     """Create a learning rate scheduler with linear warm-up configuration.
 
@@ -470,6 +530,9 @@ def create_learning_rate_scheduler(
         T_0: Period for first restart in epochs. If None, defaults to total_epochs // 2.
         T_mult: Multiplication factor for T_0 after each restart.
         gamma: Multiplicative factor for step LR scheduler (if scheduler_type='step').
+        cycle_decay: Factor applied to ``base_lrs`` at each cosine restart.
+            Must be in ``[0.1, 1.0]``.  Default ``1.0`` (no decay).  Ignored
+            for non-cosine schedulers.
 
     Returns:
         Dictionary with keys:
@@ -498,12 +561,13 @@ def create_learning_rate_scheduler(
         warnings.simplefilter("ignore")
 
         if scheduler_type == 'cosine':
-            from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-            scheduler = CosineAnnealingWarmRestarts(
-                optimizer, T_0=T_0, T_mult=T_mult, eta_min=min_lr
+            scheduler = CosineAnnealingWarmRestartsDecay(
+                optimizer, T_0=T_0, T_mult=T_mult,
+                eta_min=min_lr, cycle_decay=cycle_decay
             )
             scheduler_desc = (
-                f"CosineAnnealingWarmRestarts (T_0={T_0}, T_mult={T_mult})"
+                f"CosineAnnealingWarmRestartsDecay (T_0={T_0}, T_mult={T_mult}, "
+                f"cycle_decay={cycle_decay})"
             )
         elif scheduler_type == 'step':
             from torch.optim.lr_scheduler import StepLR
