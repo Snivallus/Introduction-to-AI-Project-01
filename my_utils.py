@@ -215,11 +215,18 @@ def train_model(
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = lr
             else:
-                # Step the scheduler once per epoch after warm-up
+                # Step the scheduler once per epoch after warm-up.
+                # Detect restart via T_cur wrapping (CosineAnnealingWarmRestarts
+                # increments T_cur each step and resets it to 0 at a restart).
+                # This is robust to cycle_decay < 1 where the post-restart peak
+                # LR may be lower than the pre-restart LR.
+                old_T_cur = getattr(scheduler, 'T_cur', None)
                 old_lr = optimizer.param_groups[0]['lr']
+
                 scheduler.step()
                 new_lr = optimizer.param_groups[0]['lr']
-                if new_lr > old_lr:
+
+                if old_T_cur is not None and scheduler.T_cur < old_T_cur:
                     restart_count += 1
                     print(f"  >> Cosine annealing restart #{restart_count}: LR {old_lr:.6f} -> {new_lr:.6f}")
 
