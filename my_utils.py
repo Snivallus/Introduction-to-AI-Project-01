@@ -477,7 +477,7 @@ class CosineAnnealingWarmRestartsDecay(CosineAnnealingWarmRestarts):
         eta_min: Minimum learning rate.
         last_epoch: The index of the last epoch.
         cycle_decay: Factor multiplied into ``base_lrs`` at each restart.
-            Clamped to ``[0.1, 1.0]``.  Default ``1.0`` (no decay).
+            Clamped to ``[0.01, 1.0]``.  Default ``1.0`` (no decay).
     """
     def __init__(
         self,
@@ -488,13 +488,13 @@ class CosineAnnealingWarmRestartsDecay(CosineAnnealingWarmRestarts):
         last_epoch: int = -1,
         cycle_decay: float = 1.0,
     ) -> None:
-        if cycle_decay < 0.1 or cycle_decay > 1.0:
+        if cycle_decay < 0.01 or cycle_decay > 1.0:
             import warnings
             warnings.warn(
-                f"cycle_decay={cycle_decay} is outside [0.1, 1.0]; "
-                f"clamping to {max(0.1, min(1.0, cycle_decay))}"
+                f"cycle_decay={cycle_decay} is outside [0.01, 1.0]; "
+                f"clamping to {max(0.01, min(1.0, cycle_decay))}"
             )
-        self.cycle_decay = max(0.1, min(1.0, cycle_decay))
+        self.cycle_decay = max(0.01, min(1.0, cycle_decay))
         self._restart_count = 0
         super().__init__(optimizer, T_0, T_mult, eta_min, last_epoch)
 
@@ -558,8 +558,7 @@ def create_learning_rate_scheduler(
         T_mult: Multiplication factor for T_0 after each restart.
         gamma: Multiplicative factor for step LR scheduler (if scheduler_type='step').
         cycle_decay: Factor applied to ``base_lrs`` at each cosine restart.
-            Must be in ``[0.1, 1.0]``.  Default ``1.0`` (no decay).  Ignored
-            for non-cosine schedulers.
+            Must be in ``[0.01, 1.0]``.  Default ``1.0`` (no decay).  Ignored for non-cosine schedulers.
 
     Returns:
         Dictionary with keys:
@@ -655,7 +654,7 @@ def train_experiment(
         num_epochs: Maximum number of training epochs.
         T_0: Number of epochs for the first cosine annealing restart.
         T_mult: Multiplication factor for T_0 after each restart.
-        cycle_decay: Factor to decay the learning rate at each cosine restart (0.1 to 1.0).
+        cycle_decay: Factor to decay the learning rate at each cosine restart (0.01 to 1.0).
         ckpt_dir: Directory for model checkpoints.
         log_dir: Directory for training log files.
 
