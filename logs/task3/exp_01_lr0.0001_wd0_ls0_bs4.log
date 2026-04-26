@@ -1,0 +1,26 @@
+Using GPU: NVIDIA GeForce RTX 4090
+Created CosineAnnealingWarmRestartsDecay (T_0=30, T_mult=1, cycle_decay=0.01)
+  Warm-up: 5 epoch(s), Initial LR: 0.0001
+  Min LR: 1.0000000000000002e-06, Total epochs: 60
+Training on device: cuda:0
+Initial training loss (before training): 2.3193
+Initial validation accuracy (before training): 9.60%
+--------------------------------------------------
+Epoch 1/60: Train Loss: 2.0128, Val Accuracy: 33.70%, Learning Rate: 0.000020, Grad Norm: 6.7139
+  -> New best model saved with accuracy: 33.70%
+Epoch 2/60: Train Loss: 1.7241, Val Accuracy: 41.04%, Learning Rate: 0.000040, Grad Norm: 13.5791
+  -> New best model saved with accuracy: 41.04%
+Epoch 3/60: Train Loss: 1.5807, Val Accuracy: 45.26%, Learning Rate: 0.000060, Grad Norm: 16.7481
+  -> New best model saved with accuracy: 45.26%
+Epoch 4/60: Train Loss: 1.4965, Val Accuracy: 48.56%, Learning Rate: 0.000080, Grad Norm: 17.4745
+  -> New best model saved with accuracy: 48.56%
+Epoch 5/60: Train Loss: 1.4266, Val Accuracy: 50.66%, Learning Rate: 0.000100, Grad Norm: 17.3883
+  -> New best model saved with accuracy: 50.66%
+Epoch 6/60: Train Loss: 1.3539, Val Accuracy: 52.90%, Learning Rate: 0.000100, Grad Norm: 17.5093
+  -> New best model saved with accuracy: 52.90%
+Epoch 7/60: Train Loss: 1.2920, Val Accuracy: 54.58%, Learning Rate: 0.000099, Grad Norm: 17.8178
+  -> New best model saved with accuracy: 54.58%
+Epoch 8/60: Train Loss: 1.2392, Val Accuracy: 56.84%, Learning Rate: 0.000098, Grad Norm: 18.1472
+  -> New best model saved with accuracy: 56.84%
+Epoch 9/60: Train Loss: 1.1895, Val Accuracy: 56.26%, Learning Rate: 0.000096, Grad Norm: 18.5781
+  -> No improvement for 1 epoch(s)

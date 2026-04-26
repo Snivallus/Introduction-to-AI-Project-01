@@ -10,13 +10,7 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
 
 # IDE files
 .vscode/
@@ -28,16 +22,9 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
-# Logs and outputs
-*.log
-*.pth
-*.pt
-checkpoints/
-models/
-DEVELOP_PLAN.md
-
 # Claude Code files
 .claude/
 CLAUDE.md
+DEVELOP_PLAN.md
 CODING_STYLE.md
 example_cnn.py
