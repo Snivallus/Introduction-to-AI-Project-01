@@ -633,6 +633,7 @@ def train_experiment(
     T_0: int,
     T_mult: int,
     cycle_decay: float,
+    momentum: float,
     ckpt_dir: str,
     log_dir: str,
 ) -> Dict[str, Any]:
@@ -655,6 +656,7 @@ def train_experiment(
         T_0: Number of epochs for the first cosine annealing restart.
         T_mult: Multiplication factor for T_0 after each restart.
         cycle_decay: Factor to decay the learning rate at each cosine restart (0.01 to 1.0).
+        momentum: Momentum factor for SGD optimizer.
         ckpt_dir: Directory for model checkpoints.
         log_dir: Directory for training log files.
 
@@ -704,8 +706,14 @@ def train_experiment(
                 testset, batch_size=bs, shuffle=False, num_workers=1,
             )
 
-            # Adam optimizer with L2 regularization via weight_decay
-            optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+            # SGD optimizer with L2 regularization via weight_decay
+            optimizer = optim.SGD(
+                model.parameters(), 
+                lr=lr, 
+                weight_decay=wd,
+                momentum=momentum,
+                nesterov=True
+            )
             criterion = nn.CrossEntropyLoss(label_smoothing=ls)
 
             # Cosine annealing scheduler with linear warm-up
@@ -854,6 +862,51 @@ def plot_task3_hyperparameter_effects(
     plt.savefig(save_path / f'{figure_prefix}_hyperparameter_effects.pdf', dpi=300, bbox_inches='tight')
     plt.show()
     print(f"Saved: {save_path / f'{figure_prefix}_hyperparameter_effects.pdf'}")
+
+    # ── Second figure: LR × BS interaction grouped bar chart ──────────────
+    if 'learning_rate' in results_df.columns and 'batch_size' in results_df.columns:
+        fig2, ax2 = plt.subplots(figsize=(9, 6))
+
+        # Aggregate over the remaining hyperparameters (WD, LS)
+        grouped = results_df.groupby(['learning_rate', 'batch_size'])[metric]
+        means = grouped.mean().unstack(level='batch_size')
+        stds = grouped.std().unstack(level='batch_size')
+
+        n_lr = means.shape[0]
+        n_bs = means.shape[1]
+        bar_width = 0.8 / n_lr
+        x = np.arange(n_bs)
+
+        colors = ['#2196F3', '#FF9800', '#4CAF50']
+        for i, lr_val in enumerate(means.index):
+            offset = (i - (n_lr - 1) / 2) * bar_width
+            ax2.bar(
+                x + offset, means.loc[lr_val].values,
+                yerr=stds.loc[lr_val].values,
+                width=bar_width, label=f'lr = {lr_val}',
+                color=colors[i % len(colors)], capsize=4,
+                edgecolor='white', linewidth=0.8,
+                error_kw={'linewidth': 1.5},
+            )
+
+        ax2.set_xticks(x)
+        tick_labels_bs = []
+        for v in means.columns:
+            if isinstance(v, float) and v < 0.001:
+                tick_labels_bs.append(f'{v:.1e}')
+            else:
+                tick_labels_bs.append(str(v))
+        ax2.set_xticklabels(tick_labels_bs)
+        ax2.set_xlabel('Batch Size')
+        ax2.set_ylabel('Accuracy (%)')
+        ax2.set_title(f'LR × BS Interaction Effect on {metric}', fontsize=13, fontweight='bold')
+        ax2.legend(title='Learning Rate', fontsize=9)
+        ax2.grid(True, alpha=0.3, axis='y')
+
+        plt.tight_layout()
+        plt.savefig(save_path / f'{figure_prefix}_lr_bs_interaction.pdf', dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Saved: {save_path / f'{figure_prefix}_lr_bs_interaction.pdf'}")
 
 
 def _has_dropout(model: nn.Module) -> bool:

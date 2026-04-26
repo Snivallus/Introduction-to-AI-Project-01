@@ -1,0 +1,139 @@
+Using GPU: NVIDIA GeForce RTX 4090
+Created CosineAnnealingWarmRestartsDecay (T_0=48, T_mult=1, cycle_decay=0.05)
+  Warm-up: 5 epoch(s), Initial LR: 0.005
+  Min LR: 5e-05, Total epochs: 64
+Training on device: cuda:0
+Initial training loss (before training): 2.3238
+Initial validation accuracy (before training): 9.88%
+--------------------------------------------------
+Epoch 1/64: Train Loss: 2.2998, Val Accuracy: 14.18%, Learning Rate: 0.001000, Grad Norm: 0.1750
+  -> New best model saved with accuracy: 14.18%
+Epoch 2/64: Train Loss: 2.0258, Val Accuracy: 34.60%, Learning Rate: 0.002000, Grad Norm: 1.4898
+  -> New best model saved with accuracy: 34.60%
+Epoch 3/64: Train Loss: 1.7097, Val Accuracy: 39.74%, Learning Rate: 0.003000, Grad Norm: 3.1703
+  -> New best model saved with accuracy: 39.74%
+Epoch 4/64: Train Loss: 1.5863, Val Accuracy: 44.58%, Learning Rate: 0.004000, Grad Norm: 3.7012
+  -> New best model saved with accuracy: 44.58%
+Epoch 5/64: Train Loss: 1.4979, Val Accuracy: 47.90%, Learning Rate: 0.005000, Grad Norm: 4.0773
+  -> New best model saved with accuracy: 47.90%
+Epoch 6/64: Train Loss: 1.4193, Val Accuracy: 50.62%, Learning Rate: 0.004995, Grad Norm: 4.3015
+  -> New best model saved with accuracy: 50.62%
+Epoch 7/64: Train Loss: 1.3574, Val Accuracy: 52.36%, Learning Rate: 0.004979, Grad Norm: 4.5480
+  -> New best model saved with accuracy: 52.36%
+Epoch 8/64: Train Loss: 1.3071, Val Accuracy: 54.34%, Learning Rate: 0.004952, Grad Norm: 4.8175
+  -> New best model saved with accuracy: 54.34%
+Epoch 9/64: Train Loss: 1.2642, Val Accuracy: 54.94%, Learning Rate: 0.004916, Grad Norm: 4.8644
+  -> New best model saved with accuracy: 54.94%
+Epoch 10/64: Train Loss: 1.2234, Val Accuracy: 57.36%, Learning Rate: 0.004869, Grad Norm: 5.0723
+  -> New best model saved with accuracy: 57.36%
+Epoch 11/64: Train Loss: 1.1886, Val Accuracy: 57.94%, Learning Rate: 0.004812, Grad Norm: 5.1915
+  -> New best model saved with accuracy: 57.94%
+Epoch 12/64: Train Loss: 1.1588, Val Accuracy: 59.34%, Learning Rate: 0.004745, Grad Norm: 5.3081
+  -> New best model saved with accuracy: 59.34%
+Epoch 13/64: Train Loss: 1.1326, Val Accuracy: 58.82%, Learning Rate: 0.004668, Grad Norm: 5.3818
+  -> No improvement for 1 epoch(s)
+Epoch 14/64: Train Loss: 1.1122, Val Accuracy: 60.84%, Learning Rate: 0.004583, Grad Norm: 5.4732
+  -> New best model saved with accuracy: 60.84%
+Epoch 15/64: Train Loss: 1.0912, Val Accuracy: 61.06%, Learning Rate: 0.004489, Grad Norm: 5.4207
+  -> New best model saved with accuracy: 61.06%
+Epoch 16/64: Train Loss: 1.0708, Val Accuracy: 61.44%, Learning Rate: 0.004386, Grad Norm: 5.4885
+  -> New best model saved with accuracy: 61.44%
+Epoch 17/64: Train Loss: 1.0501, Val Accuracy: 61.26%, Learning Rate: 0.004275, Grad Norm: 5.5196
+  -> No improvement for 1 epoch(s)
+Epoch 18/64: Train Loss: 1.0330, Val Accuracy: 61.86%, Learning Rate: 0.004157, Grad Norm: 5.6507
+  -> New best model saved with accuracy: 61.86%
+Epoch 19/64: Train Loss: 1.0173, Val Accuracy: 62.32%, Learning Rate: 0.004032, Grad Norm: 5.6604
+  -> New best model saved with accuracy: 62.32%
+Epoch 20/64: Train Loss: 1.0022, Val Accuracy: 62.74%, Learning Rate: 0.003900, Grad Norm: 5.7135
+  -> New best model saved with accuracy: 62.74%
+Epoch 21/64: Train Loss: 0.9885, Val Accuracy: 63.22%, Learning Rate: 0.003763, Grad Norm: 5.7862
+  -> New best model saved with accuracy: 63.22%
+Epoch 22/64: Train Loss: 0.9751, Val Accuracy: 63.90%, Learning Rate: 0.003620, Grad Norm: 5.9478
+  -> New best model saved with accuracy: 63.90%
+Epoch 23/64: Train Loss: 0.9595, Val Accuracy: 63.72%, Learning Rate: 0.003472, Grad Norm: 5.8849
+  -> No improvement for 1 epoch(s)
+Epoch 24/64: Train Loss: 0.9499, Val Accuracy: 64.50%, Learning Rate: 0.003321, Grad Norm: 6.0074
+  -> New best model saved with accuracy: 64.50%
+Epoch 25/64: Train Loss: 0.9347, Val Accuracy: 64.08%, Learning Rate: 0.003166, Grad Norm: 5.9908
+  -> No improvement for 1 epoch(s)
+Epoch 26/64: Train Loss: 0.9256, Val Accuracy: 64.98%, Learning Rate: 0.003008, Grad Norm: 6.1003
+  -> New best model saved with accuracy: 64.98%
+Epoch 27/64: Train Loss: 0.9150, Val Accuracy: 64.62%, Learning Rate: 0.002848, Grad Norm: 6.1346
+  -> No improvement for 1 epoch(s)
+Epoch 28/64: Train Loss: 0.9100, Val Accuracy: 64.68%, Learning Rate: 0.002687, Grad Norm: 6.2076
+  -> No improvement for 2 epoch(s)
+Epoch 29/64: Train Loss: 0.8957, Val Accuracy: 65.04%, Learning Rate: 0.002525, Grad Norm: 6.1454
+  -> New best model saved with accuracy: 65.04%
+Epoch 30/64: Train Loss: 0.8905, Val Accuracy: 65.16%, Learning Rate: 0.002363, Grad Norm: 6.2402
+  -> New best model saved with accuracy: 65.16%
+Epoch 31/64: Train Loss: 0.8788, Val Accuracy: 66.00%, Learning Rate: 0.002202, Grad Norm: 6.3315
+  -> New best model saved with accuracy: 66.00%
+Epoch 32/64: Train Loss: 0.8731, Val Accuracy: 66.26%, Learning Rate: 0.002042, Grad Norm: 6.2818
+  -> New best model saved with accuracy: 66.26%
+Epoch 33/64: Train Loss: 0.8627, Val Accuracy: 65.58%, Learning Rate: 0.001884, Grad Norm: 6.3728
+  -> No improvement for 1 epoch(s)
+Epoch 34/64: Train Loss: 0.8571, Val Accuracy: 65.88%, Learning Rate: 0.001729, Grad Norm: 6.4424
+  -> No improvement for 2 epoch(s)
+Epoch 35/64: Train Loss: 0.8535, Val Accuracy: 65.86%, Learning Rate: 0.001578, Grad Norm: 6.4789
+  -> No improvement for 3 epoch(s)
+Epoch 36/64: Train Loss: 0.8466, Val Accuracy: 66.46%, Learning Rate: 0.001430, Grad Norm: 6.4814
+  -> New best model saved with accuracy: 66.46%
+Epoch 37/64: Train Loss: 0.8420, Val Accuracy: 66.20%, Learning Rate: 0.001288, Grad Norm: 6.4953
+  -> No improvement for 1 epoch(s)
+Epoch 38/64: Train Loss: 0.8349, Val Accuracy: 66.24%, Learning Rate: 0.001150, Grad Norm: 6.5173
+  -> No improvement for 2 epoch(s)
+Epoch 39/64: Train Loss: 0.8323, Val Accuracy: 66.72%, Learning Rate: 0.001018, Grad Norm: 6.5443
+  -> New best model saved with accuracy: 66.72%
+Epoch 40/64: Train Loss: 0.8272, Val Accuracy: 66.64%, Learning Rate: 0.000893, Grad Norm: 6.6481
+  -> No improvement for 1 epoch(s)
+Epoch 41/64: Train Loss: 0.8224, Val Accuracy: 66.56%, Learning Rate: 0.000775, Grad Norm: 6.5662
+  -> No improvement for 2 epoch(s)
+Epoch 42/64: Train Loss: 0.8187, Val Accuracy: 66.78%, Learning Rate: 0.000664, Grad Norm: 6.5761
+  -> New best model saved with accuracy: 66.78%
+Epoch 43/64: Train Loss: 0.8164, Val Accuracy: 66.96%, Learning Rate: 0.000561, Grad Norm: 6.6619
+  -> New best model saved with accuracy: 66.96%
+Epoch 44/64: Train Loss: 0.8158, Val Accuracy: 66.96%, Learning Rate: 0.000467, Grad Norm: 6.6349
+  -> No improvement for 1 epoch(s)
+Epoch 45/64: Train Loss: 0.8096, Val Accuracy: 66.84%, Learning Rate: 0.000382, Grad Norm: 6.5451
+  -> No improvement for 2 epoch(s)
+Epoch 46/64: Train Loss: 0.8095, Val Accuracy: 66.84%, Learning Rate: 0.000305, Grad Norm: 6.6386
+  -> No improvement for 3 epoch(s)
+Epoch 47/64: Train Loss: 0.8079, Val Accuracy: 66.86%, Learning Rate: 0.000238, Grad Norm: 6.7157
+  -> No improvement for 4 epoch(s)
+Epoch 48/64: Train Loss: 0.8027, Val Accuracy: 66.84%, Learning Rate: 0.000181, Grad Norm: 6.5339
+  -> No improvement for 5 epoch(s)
+Epoch 49/64: Train Loss: 0.8069, Val Accuracy: 67.08%, Learning Rate: 0.000134, Grad Norm: 6.6472
+  -> New best model saved with accuracy: 67.08%
+Epoch 50/64: Train Loss: 0.8049, Val Accuracy: 66.98%, Learning Rate: 0.000098, Grad Norm: 6.6136
+  -> No improvement for 1 epoch(s)
+Epoch 51/64: Train Loss: 0.8009, Val Accuracy: 66.90%, Learning Rate: 0.000071, Grad Norm: 6.6178
+  -> No improvement for 2 epoch(s)
+Epoch 52/64: Train Loss: 0.7991, Val Accuracy: 67.02%, Learning Rate: 0.000055, Grad Norm: 6.5941
+  -> No improvement for 3 epoch(s)
+  >> Cosine annealing restart #1: LR 0.000055 -> 0.000250
+Epoch 53/64: Train Loss: 0.8041, Val Accuracy: 66.86%, Learning Rate: 0.000250, Grad Norm: 6.6702
+  -> No improvement for 4 epoch(s)
+Epoch 54/64: Train Loss: 0.8058, Val Accuracy: 66.74%, Learning Rate: 0.000250, Grad Norm: 6.7301
+  -> No improvement for 5 epoch(s)
+Epoch 55/64: Train Loss: 0.8028, Val Accuracy: 66.88%, Learning Rate: 0.000249, Grad Norm: 6.7449
+  -> No improvement for 6 epoch(s)
+Epoch 56/64: Train Loss: 0.8021, Val Accuracy: 67.24%, Learning Rate: 0.000248, Grad Norm: 6.7248
+  -> New best model saved with accuracy: 67.24%
+Epoch 57/64: Train Loss: 0.7998, Val Accuracy: 67.30%, Learning Rate: 0.000247, Grad Norm: 6.7184
+  -> New best model saved with accuracy: 67.30%
+Epoch 58/64: Train Loss: 0.8028, Val Accuracy: 67.26%, Learning Rate: 0.000245, Grad Norm: 6.7942
+  -> No improvement for 1 epoch(s)
+Epoch 59/64: Train Loss: 0.7996, Val Accuracy: 67.24%, Learning Rate: 0.000242, Grad Norm: 6.7286
+  -> No improvement for 2 epoch(s)
+Epoch 60/64: Train Loss: 0.7969, Val Accuracy: 67.14%, Learning Rate: 0.000240, Grad Norm: 6.7311
+  -> No improvement for 3 epoch(s)
+Epoch 61/64: Train Loss: 0.8010, Val Accuracy: 66.92%, Learning Rate: 0.000237, Grad Norm: 6.7421
+  -> No improvement for 4 epoch(s)
+Epoch 62/64: Train Loss: 0.7977, Val Accuracy: 67.46%, Learning Rate: 0.000233, Grad Norm: 6.7425
+  -> New best model saved with accuracy: 67.46%
+Epoch 63/64: Train Loss: 0.7950, Val Accuracy: 66.94%, Learning Rate: 0.000229, Grad Norm: 6.8070
+  -> No improvement for 1 epoch(s)
+Epoch 64/64: Train Loss: 0.7974, Val Accuracy: 67.24%, Learning Rate: 0.000225, Grad Norm: 6.7939
+  -> No improvement for 2 epoch(s)
+Finished Training
+Best validation accuracy: 67.46% at epoch 62 with train loss: 0.7977
