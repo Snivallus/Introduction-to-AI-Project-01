@@ -29,5 +29,9 @@ DEVELOP_PLAN.md
 CODING_STYLE.md
 example_cnn.py
 
-# Latex
-latex/
+# Latex build artifacts (only track source files)
+latex/*
+!latex/neurips_2026.pdf
+!latex/neurips_2026.tex
+!latex/neurips_2026.sty
+!latex/references.bib
