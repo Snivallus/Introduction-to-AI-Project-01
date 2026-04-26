@@ -12,7 +12,15 @@ This project systematically explores convolutional neural network (CNN) design a
 
 4. **Modern CNN (MyCNN)** — Implement a ResNet-18 variant adapted for 32×32 inputs: replace the initial 7×7 convolution with a 3×3 convolution, remove the initial max-pooling, and adjust the final fully-connected layer for 10 classes. Train with stronger data augmentation and cosine annealing with warm restarts to surpass LeNet-5 performance.
 
-Requirements: Python >= 3.11, PyTorch, torchvision, matplotlib. See `requirements.txt` for the full dependency list.
+## Requirements
+
+- Python >= 3.11
+- PyTorch
+- torchvision
+- numpy
+- matplotlib
+
+See `requirements.txt` for the full dependency list with version pins.
 
 ## Folder Structure
 
