@@ -34,6 +34,7 @@ See `requirements.txt` for the full dependency list with version pins.
 ├── my_model.py                      # Model definitions: LeNet, BasicBlock, MyCNN
 ├── my_utils.py                      # Utility functions: training, evaluation, plotting
 ├── task3_hyperparameter_results.csv # Aggregated results from the 54-experiment grid search
+├── evaluate_best_model.py           # [Remedial] One-shot script to obtain Best/Worst F1 for the best tuned LeNet-5; see TODO below
 │
 ├── checkpoints/                     # Model weight files (.pth) organised by experiment
 │   ├── lenet_baseline/              #   Baseline LeNet-5 checkpoint
@@ -57,3 +58,8 @@ See `requirements.txt` for the full dependency list with version pins.
 └── logs/                            # Training log files
     └── task3/                       #   54 log files named by hyperparameter combination
 ```
+
+## TODO
+
+- **Remove `evaluate_best_model.py`**: This remedial file was created because the Task 3 hyperparameter-tuning pipeline (`train_experiment` in `my_utils.py`) only returned `test_accuracy` without per-class F1 metrics. After the pipeline is updated, `evaluate_best_model.py` should be deleted.
+- **Update `train_experiment` return value**: Modify `my_utils.py` → `train_experiment()` to return richer results (including per-class F1, Best F1, Worst F1, ECE, etc.) and record them in `task3_hyperparameter_results.csv` so that a separate evaluation script is unnecessary for future runs.
